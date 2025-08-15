@@ -1,4 +1,4 @@
-# 🛍️ Peddlr POS Mobile App
+# 🛍️ Tindera POS Mobile App
 
 A modern, feature-rich Point of Sale (POS) mobile application built with Next.js 15, TypeScript, and Tailwind CSS. Designed specifically for mobile-first retail operations with comprehensive inventory management and multi-unit pricing support.
 
