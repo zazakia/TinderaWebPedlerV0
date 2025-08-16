@@ -115,7 +115,7 @@ const categories = [
   { name: "Powder Drink", active: false },
 ]
 
-function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }) {
+function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void; products: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
   const [cart, setCart] = useState<{ [key: number]: number }>({
     1: 2.0,
     2: 1.0,
@@ -124,7 +124,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
   })
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
-  const [currentScreen, setCurrentScreen] = useState<"pos" | "receipt" | "payment">("pos")
+  const [posScreen, setPosScreen] = useState<"pos" | "receipt" | "payment">("pos")
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     number: "",
@@ -181,13 +181,13 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
       }))
   }
 
-  if (currentScreen === "payment") {
+  if (posScreen === "payment") {
     return (
       <div className="min-h-screen bg-gray-50 max-w-sm mx-auto">
         {/* Header */}
         <div className="bg-white px-4 py-4 border-b">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" className="p-2" onClick={() => setCurrentScreen("pos")}>
+            <Button variant="ghost" size="sm" className="p-2" onClick={() => setPosScreen("pos")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </div>
@@ -232,13 +232,13 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
           {/* Payment Method Buttons */}
           <div className="space-y-6">
             <Button 
-              onClick={() => setCurrentScreen("receipt")}
+              onClick={() => setPosScreen("receipt")}
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200"
             >
               Cash
             </Button>
             <Button 
-              onClick={() => setCurrentScreen("receipt")}
+              onClick={() => setPosScreen("receipt")}
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200"
             >
               <div className="text-center">
@@ -252,7 +252,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
     )
   }
 
-  if (currentScreen === "receipt") {
+  if (posScreen === "receipt") {
     const cartItems = getCartItems()
     const currentDate = new Date()
     const formattedDate = currentDate.toLocaleDateString("en-US", {
@@ -271,7 +271,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
         {/* Header */}
         <div className="bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={() => setCurrentScreen("pos")} />
+            <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={() => setPosScreen("pos")} />
             <div>
               <h1 className="text-lg font-semibold">dickit agad glue</h1>
               <p className="text-xs text-gray-600">Business Address | Contact Number</p>
@@ -407,7 +407,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
         {/* Confirm Button */}
         <div className="px-4 mt-6 pb-6">
           <Button 
-            onClick={() => setCurrentScreen("payment")}
+            onClick={() => setPosScreen("payment")}
             className="w-full bg-pink-500 hover:bg-pink-600 text-white py-4 text-lg font-semibold rounded-lg"
           >
             CONFIRM
@@ -517,7 +517,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
       <div className="fixed bottom-44 left-1/2 transform -translate-x-1/2 w-full max-w-sm px-2 z-10">
         <div
           className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg p-4 text-white shadow-lg cursor-pointer hover:opacity-90"
-          onClick={() => setCurrentScreen("receipt")}
+          onClick={() => setPosScreen("receipt")}
         >
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">REVIEW</span>
@@ -577,7 +577,7 @@ function POSScreen({ onBack, products }: { onBack: () => void; products: any[] }
   )
 }
 
-function InventoryScreen({ onBack, products, setProducts }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>> }) {
+function InventoryScreen({ products, setProducts, setCurrentScreen }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
   const [activeTab, setActiveTab] = useState<"list" | "replenishment">("list")
   const [showStockAtCategory, setShowStockAtCategory] = useState(true)
   const [showStockInPOS, setShowStockInPOS] = useState(true)
@@ -627,9 +627,8 @@ function InventoryScreen({ onBack, products, setProducts }: { onBack: () => void
     <div className="h-screen bg-gray-100 max-w-sm mx-auto flex flex-col">
       {/* Header */}
       <div className="bg-white px-4 py-4 flex-shrink-0">
-        <div className="flex items-center gap-4 mb-4">
-          <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} />
-          <h1 className="text-2xl font-bold text-gray-800 text-center flex-1">INVENTORY</h1>
+        <div className="flex items-center justify-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-800">INVENTORY</h1>
         </div>
 
         {/* Tabs */}
@@ -826,7 +825,7 @@ function InventoryScreen({ onBack, products, setProducts }: { onBack: () => void
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
         <div className="flex justify-around items-center py-3 relative">
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("dashboard")}>
             <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
             <p className="text-xs text-gray-400">Home</p>
           </div>
@@ -836,19 +835,19 @@ function InventoryScreen({ onBack, products, setProducts }: { onBack: () => void
             <p className="text-xs text-purple-600 font-medium">Inventory</p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("addProduct")}>
             <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
               <Plus className="w-8 h-8 text-white" />
             </div>
             <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
             <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
             <p className="text-xs text-gray-400">Products</p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("pos")}>
             <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
             <p className="text-xs text-gray-400">Store</p>
           </div>
@@ -858,7 +857,7 @@ function InventoryScreen({ onBack, products, setProducts }: { onBack: () => void
   )
 }
 
-function ProductsScreen({ onBack, products, setProducts }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>> }) {
+function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [bulkEditMode, setBulkEditMode] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
@@ -1068,14 +1067,9 @@ function ProductsScreen({ onBack, products, setProducts }: { onBack: () => void;
     )
   }
 
-  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
-    "dashboard",
-  )
-
   return (
     <div className="min-h-screen bg-gray-100 max-w-sm mx-auto">
       {/* Products Screen */}
-      {currentScreen === "products" && (
         <div className="min-h-screen bg-gray-50">
           {/* Header */}
           <div className="bg-white px-4 py-3 flex items-center justify-between border-b">
@@ -1298,21 +1292,21 @@ function ProductsScreen({ onBack, products, setProducts }: { onBack: () => void;
                 <p className="text-xs text-gray-400">Home</p>
               </div>
 
-              <div className="text-center">
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
                 <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
                 <p className="text-xs text-gray-400">Inventory</p>
               </div>
 
-              <div className="text-center cursor-pointer hover:opacity-80" onClick={handleAddProductClick}>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("addProduct")}>
                 <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
                   <Plus className="w-8 h-8 text-white" />
                 </div>
                 <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
               </div>
 
-              <div className="text-center">
-                <FileText className="w-6 h-6 text-purple-600 mx-auto mb-1" />
-                <p className="text-xs text-purple-600 font-medium">Products</p>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
+                <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Products</p>
               </div>
 
               <div className="text-center">
@@ -2012,7 +2006,7 @@ function ProductsScreen({ onBack, products, setProducts }: { onBack: () => void;
             <p className="text-xs text-gray-400">Home</p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
             <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
             <p className="text-xs text-gray-400">Inventory</p>
           </div>
@@ -2029,7 +2023,7 @@ function ProductsScreen({ onBack, products, setProducts }: { onBack: () => void;
             <p className="text-xs text-purple-600 font-medium">Products</p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("pos")}>
             <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
             <p className="text-xs text-gray-400">Store</p>
           </div>
@@ -2066,15 +2060,15 @@ export default function Dashboard() {
   }
 
   if (currentScreen === "pos") {
-    return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} />
+    return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} setCurrentScreen={setCurrentScreen} />
   }
 
   if (currentScreen === "inventory") {
-    return <InventoryScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} />
+    return <InventoryScreen products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
   }
 
   if (currentScreen === "products") {
-    return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} />
+    return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
   }
 
   if (currentScreen === "addProduct") {
@@ -2082,6 +2076,7 @@ export default function Dashboard() {
       <AddProduct 
         onBack={() => setCurrentScreen("dashboard")} 
         onSave={handleSaveNewProduct}
+        setCurrentScreen={setCurrentScreen}
       />
     )
   }

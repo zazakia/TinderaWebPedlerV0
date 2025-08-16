@@ -7,6 +7,10 @@ import {
   X,
   Plus,
   Minus,
+  Home,
+  Package,
+  FileText,
+  ShoppingBag,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,9 +55,10 @@ interface ProductForm {
 interface AddProductProps {
   onBack?: () => void
   onSave?: (productData: ProductForm) => void
+  setCurrentScreen?: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">>
 }
 
-export default function AddProduct({ onBack, onSave }: AddProductProps) {
+export default function AddProduct({ onBack, onSave, setCurrentScreen }: AddProductProps) {
   const [formData, setFormData] = useState<ProductForm>({
     productGroup: "",
     productName: "",
@@ -648,11 +653,43 @@ export default function AddProduct({ onBack, onSave }: AddProductProps) {
         {/* Save Button */}
         <Button 
           onClick={handleSave}
-          className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 text-lg font-medium"
+          className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 text-lg font-medium mb-20"
           size="lg"
         >
           SAVE
         </Button>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
+        <div className="flex justify-around items-center py-3 relative">
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("dashboard")}>
+            <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+            <p className="text-xs text-gray-400">Home</p>
+          </div>
+
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("inventory")}>
+            <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+            <p className="text-xs text-gray-400">Inventory</p>
+          </div>
+
+          <div className="text-center">
+            <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
+              <Plus className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
+          </div>
+
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("products")}>
+            <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+            <p className="text-xs text-gray-400">Products</p>
+          </div>
+
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("pos")}>
+            <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+            <p className="text-xs text-gray-400">Store</p>
+          </div>
+        </div>
       </div>
 
       {/* Modal for Additional Details */}
