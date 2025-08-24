@@ -1,183 +1,183 @@
-# 🛍️ Tindera POS Mobile App
+# Supabase CLI
 
-A modern, feature-rich Point of Sale (POS) mobile application built with Next.js 15, TypeScript, and Tailwind CSS. Designed specifically for mobile-first retail operations with comprehensive inventory management and multi-unit pricing support.
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-![Peddlr POS](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-Latest-blue?style=for-the-badge&logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Latest-38B2AC?style=for-the-badge&logo=tailwind-css)
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-## ✨ Features
+This repository contains all the functionality for Supabase CLI.
 
-### 🏪 **Point of Sale (POS)**
-- **Mobile-First Design**: Optimized for smartphone and tablet use
-- **Product Catalog**: Browse products by categories with search functionality
-- **Shopping Cart**: Add/remove items with quantity management
-- **Multi-Unit Pricing**: Support for retail and wholesale pricing
-- **Payment Processing**: Cash and Credit payment options
-- **Receipt Generation**: Digital receipts with customer details
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-### 📦 **Inventory Management**
-- **Real-Time Stock Tracking**: Live inventory updates
-- **Category Organization**: Products grouped by categories
-- **Stock Adjustments**: Quick +/- stock level controls
-- **Low Stock Alerts**: Configurable low stock level warnings
-- **Bulk Operations**: Edit multiple products simultaneously
-- **Scrollable Interface**: Handle large inventory lists efficiently
+## Getting started
 
-### 🏷️ **Product Management**
-- **Advanced Add Product Form**: Comprehensive product creation
-- **Multi-Unit Support**: Configure up to 5 different units per product
-- **Auto-Pricing**: Automatic price calculation based on conversion factors
-- **Wholesale/Retail Types**: Separate pricing for different customer types
-- **Product Variants**: Support for product variations
-- **Notes & Descriptions**: Detailed product information
+### Install the CLI
 
-### 🎨 **User Interface**
-- **Modern Design**: Clean, intuitive mobile interface
-- **Dark/Light Themes**: Theme switching support
-- **Responsive Layout**: Adaptive design for all screen sizes
-- **Smooth Animations**: Polished user experience
-- **Touch-Friendly**: Large buttons and easy navigation
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
-## 🛠️ Technology Stack
-
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui (Radix UI primitives)
-- **Icons**: Lucide React
-- **State Management**: React Hooks
-- **Forms**: React Hook Form with Zod validation
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js 18+ 
-- npm or pnpm package manager
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/peddlr-pos-mobile.git
-   cd peddlr-pos-mobile
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
-
-3. **Run the development server**
-   ```bash
-   npm run dev
-   # or
-   pnpm dev
-   ```
-
-4. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## 📱 Application Structure
-
-### Main Screens
-- **Dashboard**: Overview with quick actions and navigation
-- **POS**: Point of sale interface for transactions
-- **Inventory**: Stock management and product editing
-- **Products**: Product catalog and management
-- **Add Product**: Comprehensive product creation form
-- **Payment**: Payment confirmation and processing
-- **Receipt**: Digital receipt generation
-
-### Key Components
-- **AddProduct**: Advanced product creation with multi-unit support
-- **ProductCard**: Product display with pricing and stock info
-- **Cart**: Shopping cart management
-- **PaymentScreen**: Payment processing interface
-- **InventoryList**: Scrollable inventory management
-
-## 🔧 Configuration
-
-### Development Commands
 ```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm run start
-
-# Run linting
-npm run lint
+npm i supabase --save-dev
 ```
 
-### Environment Setup
-The application runs with default settings. For production deployment, ensure:
-- Proper image optimization settings
-- Database connections (if using external data)
-- Payment gateway integrations
+To install the beta release channel:
 
-## 📊 Features Overview
+```bash
+npm i supabase@beta --save-dev
+```
 
-### Multi-Unit System
-- **Base Units**: piece, bottle, pack, etc.
-- **Conversion Factors**: Automatic unit conversions
-- **Pricing Tiers**: Retail vs. wholesale pricing
-- **Auto-Calculation**: Smart price calculations
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-### Inventory Features
-- **Stock Tracking**: Real-time inventory levels
-- **Category Management**: Organized product categories
-- **Quick Actions**: Fast stock adjustments
-- **Edit Mode**: In-line product editing
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
+```
 
-### POS Capabilities
-- **Cart Management**: Add/remove/modify items
-- **Customer Details**: Optional customer information
-- **Payment Options**: Multiple payment methods
-- **Receipt Generation**: Formatted digital receipts
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
-## 🎯 Target Users
+<details>
+  <summary><b>macOS</b></summary>
 
-- **Small Retailers**: Independent shops and stores
-- **Mobile Vendors**: On-the-go sales operations
-- **Market Stalls**: Temporary retail setups
-- **Service Businesses**: Businesses with mobile sales needs
+  Available via [Homebrew](https://brew.sh). To install:
 
-## 🤝 Contributing
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
 
-## 📝 License
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+<details>
+  <summary><b>Windows</b></summary>
 
-## 🔮 Future Enhancements
+  Available via [Scoop](https://scoop.sh). To install:
 
-- [ ] Offline mode support
-- [ ] Data synchronization
-- [ ] Advanced reporting
-- [ ] Barcode scanning
-- [ ] Customer management
-- [ ] Sales analytics
-- [ ] Multi-store support
-- [ ] Cloud backup
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
 
-## 📞 Support
+  To upgrade:
 
-For support and questions:
-- Create an issue on GitHub
-- Check the documentation
-- Review existing issues and discussions
+  ```powershell
+  scoop update supabase
+  ```
+</details>
 
----
+<details>
+  <summary><b>Linux</b></summary>
 
-**Built with ❤️ for modern retail operations**
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
+
+```bash
+supabase bootstrap
+```
+
+Or using npx:
+
+```bash
+npx supabase bootstrap
+```
+
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
+
+## Docs
+
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
+
+## Breaking changes
+
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
+
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
+
+## Developing
+
+To run from source:
+
+```sh
+# Go >= 1.22
+go run . help
+```
