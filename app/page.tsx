@@ -273,8 +273,7 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
           <div className="flex items-center gap-4">
             <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={() => setPosScreen("pos")} />
             <div>
-              <h1 className="text-lg font-semibold">dickit agad glue</h1>
-              <p className="text-xs text-gray-600">Business Address | Contact Number</p>
+              <h1 className="text-lg font-semibold">Jr & Mai Agrivet</h1>
             </div>
           </div>
           <div className="text-right">
@@ -297,7 +296,22 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <div className="w-12 bg-white text-center py-2 text-sm font-semibold">{item.quantity.toFixed(2)}</div>
+                <input
+                  type="number"
+                  value={item.quantity}
+                  onChange={(e) => {
+                    const newQty = parseFloat(e.target.value) || 0;
+                    if (newQty >= 0) {
+                      setCart(prev => ({
+                        ...prev,
+                        [item.id]: newQty
+                      }));
+                    }
+                  }}
+                  className="w-12 bg-white text-center py-2 text-sm font-semibold border-0 outline-none"
+                  min="0"
+                  step="0.1"
+                />
                 <button
                   onClick={() => updateQuantity(item.id, 1)}
                   className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center"
