@@ -1189,7 +1189,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
               <div key={category} className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-700 mb-3">{category}</h2>
                 <div className="space-y-3">
-                  {categoryProducts.map((product) => (
+                  {(categoryProducts as any[]).map((product: any) => (
                     <div key={product.id} className="bg-white rounded-lg p-3 flex items-center gap-3">
                       {bulkEditMode && (
                         <input
@@ -1321,14 +1321,161 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
 
 export default function Dashboard() {
   const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
-                      onClick={() => {
-                        const colors = ["#1e40af", "#dc2626", "#059669", "#7c3aed", "#ea580c", "#0891b2"]
-                        const currentIndex = colors.indexOf(addProductForm.color)
-                        const nextColor = colors[(currentIndex + 1) % colors.length]
-                        setAddProductForm((prev) => ({ ...prev, color: nextColor }))
-                      }}
-                    />
-                  </div>
+    "dashboard"
+  )
+  
+  // Use Supabase hooks for real data
+  const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock } = useProducts()
+  const { categories, loading: categoriesLoading, createCategory } = useCategories()
+  const { createTransaction } = useTransactions()
+  const { customers, createCustomer } = useCustomers()
+  
+  // Transform database products to match the component structure
+  const products = dbProducts.map(product => ({
+    id: product.id,
+    name: product.name,
+    stock: product.stock,
+    price: product.price_retail,
+    image: product.image_url || "/placeholder.svg",
+    category: categories.find(cat => cat.id === product.category_id)?.name || "Uncategorized",
+    baseUnit: product.base_unit || "piece",
+    cost: product.cost || 0,
+    units: product.units || []
+  }))
+  
+  // State for add product form
+  const [addProductForm, setAddProductForm] = useState({
+    productGroup: "",
+    productName: "",
+    productCode: "",
+    baseUnit: "piece",
+    price: "",
+    cost: "",
+    stocks: "",
+    lowStockLevel: "",
+    color: "#1e40af",
+    hasVariant: false,
+    hasAddOn: false,
+    hasNotes: false,
+    hasDescription: false,
+    hasSellingMethod: false,
+    addToOnlineStore: true,
+    productCodeEnabled: false,
+    units: [
+      { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
+      { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
+      { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
+      { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
+      { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
+      { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
+    ],
+  })
+
+  // Handle save product function
+  const handleSaveProduct = async () => {
+    if (!addProductForm.productName.trim() || !addProductForm.price) {
+      alert("Please fill in required fields (Product Name and Price)")
+      return
+    }
+
+    // Calculate prices for other units based on base unit price and conversion factors
+    const basePrice = Number(addProductForm.price)
+    const baseCost = Number(addProductForm.cost) || 0
+
+    const updatedUnits = addProductForm.units.map((unit) => ({
+      ...unit,
+      price: unit.isBase ? basePrice : unit.price || basePrice * unit.conversionFactor * 0.9, // 10% discount for bulk
+    }))
+
+    // Create product data
+    const productData = {
+      name: addProductForm.productName,
+      price_retail: Number(addProductForm.price),
+      price_wholesale: Number(addProductForm.price) * 0.9, // Default wholesale price
+      stock: Number(addProductForm.stocks) || 0,
+      category_id: categories.find(cat => cat.name === addProductForm.productGroup)?.id || null,
+      product_group_id: null,
+      product_code: addProductForm.productCode || null,
+      base_unit: addProductForm.baseUnit,
+      cost: Number(addProductForm.cost) || 0,
+      low_stock_level: Number(addProductForm.lowStockLevel) || 10,
+      sku: `PRD${Date.now()}`,
+      unit: addProductForm.baseUnit,
+      color: addProductForm.color || '#1e40af',
+      has_variants: addProductForm.hasVariant || false,
+      has_addons: addProductForm.hasAddOn || false,
+      notes: null,
+      is_online_store: addProductForm.addToOnlineStore || false,
+      description: null
+    }
+    
+    const result = await createProduct(productData, [])
+    
+    if (result.success) {
+      // Reset form
+      setAddProductForm({
+        productGroup: "",
+        productName: "",
+        productCode: "",
+        baseUnit: "piece",
+        price: "",
+        cost: "",
+        stocks: "",
+        lowStockLevel: "",
+        color: "#1e40af",
+        hasVariant: false,
+        hasAddOn: false,
+        hasNotes: false,
+        hasDescription: false,
+        hasSellingMethod: false,
+        addToOnlineStore: true,
+        productCodeEnabled: false,
+        units: [
+          { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
+          { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
+          { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
+          { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
+          { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
+          { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
+        ],
+      })
+      setCurrentScreen("dashboard")
+    } else {
+      alert(`Failed to create product: ${result.error}`)
+    }
+  }
+
+  if (currentScreen === "addProduct") {
+    return (
+      <div className="min-h-screen bg-white max-w-sm mx-auto">
+        {/* Header */}
+        <div className="bg-pink-500 px-6 py-4 flex items-center justify-between">
+          <button onClick={() => setCurrentScreen("dashboard")} className="text-white">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-white text-lg font-medium">Add Product</h1>
+          <div className="w-6" />
+        </div>
+
+        {/* Form Content */}
+        <div className="p-6 space-y-6">
+          {/* Color and Preview Section */}
+          <div className="flex items-start gap-4">
+            {/* Color Picker */}
+            <div className="space-y-2">
+              <label className="block text-sm text-gray-600">Color</label>
+              <div className="space-y-2">
+                <button
+                  className="w-12 h-12 rounded border-2 border-gray-300"
+                  style={{ backgroundColor: addProductForm.color }}
+                  onClick={() => {
+                    const colors = ["#1e40af", "#dc2626", "#059669", "#7c3aed", "#ea580c", "#0891b2"]
+                    const currentIndex = colors.indexOf(addProductForm.color)
+                    const nextColor = colors[(currentIndex + 1) % colors.length]
+                    setAddProductForm((prev) => ({ ...prev, color: nextColor }))
+                  }}
+                />
+              </div>
 
                   {/* Product Preview */}
                   <div className="flex-1 relative">
@@ -1672,146 +1819,83 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-          )}
-
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
-        <div className="flex justify-around items-center py-3 relative">
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={onBack}>
-            <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Home</p>
           </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
-            <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Inventory</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={handleAddProductClick}>
-            <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
-              <Plus className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
-          </div>
-
-          <div className="text-center">
-            <FileText className="w-6 h-6 text-purple-600 mx-auto mb-1" />
-            <p className="text-xs text-purple-600 font-medium">Products</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("pos")}>
-            <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Store</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function Dashboard() {
-  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
-    "dashboard",
-  )
+        )
+      }
   
-  // Use Supabase hooks for real data
-  const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock } = useProducts()
-  const { categories, loading: categoriesLoading, createCategory } = useCategories()
-  const { createTransaction } = useTransactions()
-  const { customers, createCustomer } = useCustomers()
+      // Handle product updates
+      const setProducts = async (updateFn: any) => {
+        // This is a simplified version - in real app, you'd handle specific updates
+        console.log('Product update requested')
+      }
   
-  // Transform database products to match the component structure
-  const products = dbProducts.map(product => ({
-    id: product.id,
-    name: product.name,
-    stock: product.stock,
-    price: product.price_retail,
-    image: product.image_url || "/placeholder.svg",
-    category: categories.find(cat => cat.id === product.category_id)?.name || "General",
-    baseUnit: product.base_unit,
-    cost: product.cost,
-    units: product.units?.map(unit => ({
-      name: unit.unit_name,
-      conversionFactor: unit.conversion_factor,
-      price: unit.price,
-      isBase: unit.is_base_unit,
-      type: unit.unit_type
-    })) || []
-  }))
-
-  const handleSaveNewProduct = async (productData: any) => {
-    // Prepare units for database
-    const units = productData.units.map((unit: any) => ({
-      unit_name: unit.name,
-      conversion_factor: unit.conversionFactor || 1,
-      price: Number(unit.price) || 0,
-      unit_type: unit.type as 'retail' | 'wholesale',
-      is_base_unit: unit.isBase || false,
-      display_order: 0
-    }))
-
-    // Create product in database
-    const result = await createProduct({
-      name: productData.productName,
-      price_retail: Number(productData.price),
-      price_wholesale: Number(productData.price) * 0.9, // Default wholesale price
-      stock: Number(productData.stocks) || 0,
-      category_id: categories.find(cat => cat.name === productData.productGroup)?.id || null,
-      product_group_id: null,
-      product_code: productData.productCode || null,
-      base_unit: productData.baseUnit,
-      cost: Number(productData.cost) || 0,
-      low_stock_level: Number(productData.lowStockLevel) || 10,
-      sku: `PRD${Date.now()}`,
-      unit: productData.baseUnit,
-      color: productData.color || '#1e40af',
-      has_variants: productData.hasVariant || false,
-      has_addons: productData.hasAddOn || false,
-      notes: productData.notes || null,
-      is_online_store: productData.addToOnlineStore || false,
-      description: productData.description || null
-    }, units.filter(u => !u.is_base_unit)) // Don't include base unit as it's implied
+      const handleSaveNewProduct = async (productData: any) => {
+        // Prepare units for database
+        const units = productData.units.map((unit: any) => ({
+          unit_name: unit.name,
+          conversion_factor: unit.conversionFactor || 1,
+          price: Number(unit.price) || 0,
+          unit_type: unit.type as 'retail' | 'wholesale',
+          is_base_unit: unit.isBase || false,
+          display_order: 0
+        }))
     
-    if (result.success) {
-      setCurrentScreen("dashboard")
-    } else {
-      alert(`Failed to create product: ${result.error}`)
-    }
-  }
-  
-  // Handle product updates
-  const setProducts = async (updateFn: any) => {
-    // This is a simplified version - in real app, you'd handle specific updates
-    console.log('Product update requested')
-  }
+        // Create product in database
+        const result = await createProduct({
+          name: productData.productName,
+          price_retail: Number(productData.price),
+          price_wholesale: Number(productData.price) * 0.9, // Default wholesale price
+          stock: Number(productData.stocks) || 0,
+          category_id: categories.find((cat: any) => cat.name === productData.productGroup)?.id || null,
+          product_group_id: null,
+          product_code: productData.productCode || null,
+          base_unit: productData.baseUnit,
+          cost: Number(productData.cost) || 0,
+          low_stock_level: Number(productData.lowStockLevel) || 10,
+          sku: `PRD${Date.now()}`,
+          unit: productData.baseUnit,
+          color: productData.color || '#1e40af',
+          has_variants: productData.hasVariant || false,
+          has_addons: productData.hasAddOn || false,
+          notes: productData.notes || null,
+          is_online_store: productData.addToOnlineStore || false,
+          description: productData.description || null
+        }, units.filter((u: any) => !u.is_base_unit)) // Don't include base unit as it's implied
+        
+        if (result.success) {
+          setCurrentScreen("dashboard")
+        } else {
+          alert(`Failed to create product: ${result.error}`)
+        }
+      }
 
-  if (currentScreen === "pos") {
-    return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} />
-  }
+      if (currentScreen === "pos") {
+        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} />
+      }
+    
+      if (currentScreen === "inventory") {
+        return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
+      }
 
-  if (currentScreen === "inventory") {
-    return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
-  }
+      if (currentScreen === "products") {
+        return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
+      }
+    
+      if ((currentScreen as string) === "addProduct") {
+        return (
+          <AddProduct 
+            onBack={() => setCurrentScreen("dashboard")} 
+            onSave={handleSaveNewProduct}
+            setCurrentScreen={setCurrentScreen}
+          />
+        )
+      }
 
-  if (currentScreen === "products") {
-    return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
-  }
-
-  if (currentScreen === "addProduct") {
-    return (
-      <AddProduct 
-        onBack={() => setCurrentScreen("dashboard")} 
-        onSave={handleSaveNewProduct}
-        setCurrentScreen={setCurrentScreen}
-      />
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-100 max-w-sm mx-auto relative">
-      {/* Header */}
-      <div className="bg-white px-4 py-4">
-        <div className="flex items-center justify-between">
+      return (
+        <div className="min-h-screen bg-gray-100 max-w-sm mx-auto relative">
+          {/* Header */}
+          <div className="bg-white px-4 py-4">
+            <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">P</span>
