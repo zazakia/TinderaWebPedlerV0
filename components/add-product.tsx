@@ -1,750 +1,511 @@
 "use client"
 
-import {
-  ArrowLeft,
-  ImageIcon,
-  Camera,
-  X,
-  Plus,
-  Minus,
-  Home,
-  Package,
-  FileText,
-  ShoppingBag,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { useState } from "react"
+import React, { useState, useEffect } from 'react'
+import { ArrowLeft, X, Plus, Camera, ImageIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useCategories } from '@/lib/hooks/useCategories'
 
 interface Unit {
   id: string
   name: string
   conversionFactor: number
   price: number
+  type: 'retail' | 'wholesale'
   isBase: boolean
-  type: "retail" | "wholesale"
-  isAutoPricing: boolean
 }
 
-interface ProductForm {
-  productGroup: string
-  productName: string
-  productCode: string
-  baseUnit: string
-  price: number
+interface ProductData {
+  name: string
+  sku: string
+  category_id: string
+  product_group_id?: string
+  product_code?: string
+  base_unit: string
+  price_retail: number
+  price_wholesale?: number
   cost: number
-  stocks: number
-  lowStockLevel: number
-  addToOnlineStore: boolean
+  stock: number
+  low_stock_level: number
   color: string
-  photo: string | null
+  has_variants: boolean
+  has_addons: boolean
+  notes?: string
+  selling_methods?: string[]
+  is_active: boolean
+  is_online_store: boolean
+  image_url?: string
   units: Unit[]
-  variants: string[]
-  addOns: string[]
-  notes: string
-  description: string
-  sellingMethod: string
 }
 
 interface AddProductProps {
-  onBack?: () => void
-  onSave?: (productData: ProductForm) => void
-  setCurrentScreen?: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">>
+  onBack: () => void
+  onSave: (productData: ProductData) => Promise<void>
 }
 
-export default function AddProduct({ onBack, onSave, setCurrentScreen }: AddProductProps) {
-  const [formData, setFormData] = useState<ProductForm>({
-    productGroup: "",
-    productName: "",
-    productCode: "",
-    baseUnit: "pcs",
-    price: 0,
+export default function AddProduct({ onBack, onSave }: AddProductProps) {
+  const [selectedColor, setSelectedColor] = useState('#1e40af')
+  const [baseUnit, setBaseUnit] = useState('Piece')
+  const [units, setUnits] = useState<Unit[]>([])
+  const [productData, setProductData] = useState<ProductData>({
+    name: '',
+    sku: '',
+    category_id: '',
+    base_unit: 'Piece',
+    price_retail: 0,
     cost: 0,
-    stocks: 0,
-    lowStockLevel: 0,
-    addToOnlineStore: false,
-    color: "#1e40af",
-    photo: null,
-    units: [
-      { id: "1", name: "piece", conversionFactor: 1, price: 0, isBase: true, type: "retail", isAutoPricing: false }
-    ],
-    variants: [],
-    addOns: [],
-    notes: "",
-    description: "",
-    sellingMethod: ""
+    stock: 0,
+    low_stock_level: 0,
+    color: '#1e40af',
+    has_variants: false,
+    has_addons: false,
+    is_active: true,
+    is_online_store: false,
+    units: []
   })
 
-  const [activeTab, setActiveTab] = useState("basic")
-  const [modalOpen, setModalOpen] = useState(false)
-  const [currentModal, setCurrentModal] = useState<"variant" | "addon" | "notes" | "description" | "selling">("variant")
-  const [tempValue, setTempValue] = useState("")
+  const { categories } = useCategories()
 
-  const addUnit = () => {
-    if (formData.units.length >= 6) return // Max 5 additional + 1 base = 6 total
-    
-    const newUnit: Unit = {
-      id: Date.now().toString(),
-      name: "",
-      conversionFactor: 1,
-      price: 0,
-      isBase: false,
-      type: "wholesale",
-      isAutoPricing: true
-    }
-    setFormData(prev => ({
-      ...prev,
-      units: [...prev.units, newUnit]
-    }))
-  }
+  // Available colors
+  const colors = [
+    '#1e40af', '#dc2626', '#059669', '#d97706', '#7c3aed', '#db2777',
+    '#0891b2', '#65a30d', '#ea580c', '#9333ea', '#be185d', '#0284c7'
+  ]
 
-  const removeUnit = (unitId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      units: prev.units.filter(unit => unit.id !== unitId)
-    }))
-  }
+  // Base unit options
+  const baseUnitOptions = [
+    'Piece', 'Kilogram', 'Gram', 'Liter', 'Milliliter', 'Box', 'Pack', 'Bottle', 'Can', 'Bag'
+  ]
 
-  const updateUnit = (unitId: string, field: keyof Unit, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      units: prev.units.map(unit => {
-        if (unit.id === unitId) {
-          const updatedUnit = { ...unit, [field]: value }
-          
-          // Auto-calculate price if auto pricing is enabled and conversion factor changes
-          if (field === 'conversionFactor' && unit.isAutoPricing) {
-            const baseUnit = prev.units.find(u => u.isBase)
-            if (baseUnit) {
-              updatedUnit.price = baseUnit.price * value
-            }
-          }
-          
-          return updatedUnit
-        }
-        return unit
-      })
-    }))
-  }
-
-  const toggleAutoPricing = (unitId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      units: prev.units.map(unit => {
-        if (unit.id === unitId) {
-          const isAutoPricing = !unit.isAutoPricing
-          let price = unit.price
-          
-          // Calculate auto price if enabling auto pricing
-          if (isAutoPricing) {
-            const baseUnit = prev.units.find(u => u.isBase)
-            if (baseUnit) {
-              price = baseUnit.price * unit.conversionFactor
-            }
-          }
-          
-          return { ...unit, isAutoPricing, price }
-        }
-        return unit
-      })
-    }))
-  }
-
-  const handleSave = () => {
-    // Validate required fields
-    if (!formData.productName || !formData.price) {
-      alert("Please fill in Product Name and Price")
-      return
-    }
-
-    // Update the base unit price in the units array
-    const updatedUnits = formData.units.map(unit => {
-      if (unit.isBase) {
-        return { ...unit, price: formData.price }
+  useEffect(() => {
+    // Initialize with base unit
+    if (baseUnit && units.length === 0) {
+      const baseUnitObj: Unit = {
+        id: '1',
+        name: baseUnit,
+        conversionFactor: 1,
+        price: productData.price_retail,
+        type: 'retail',
+        isBase: true
       }
-      return unit
-    })
-
-    const productToSave = {
-      ...formData,
-      units: updatedUnits
+      setUnits([baseUnitObj])
     }
+  }, [baseUnit, productData.price_retail])
 
-    console.log("Saving product:", productToSave)
+  const handleAddUnit = () => {
+    if (units.length < 6) { // Max 6 additional units (7 total including base)
+      const newUnit: Unit = {
+        id: Date.now().toString(),
+        name: '',
+        conversionFactor: 1,
+        price: 0,
+        type: 'retail',
+        isBase: false
+      }
+      setUnits([...units, newUnit])
+    }
+  }
+
+  const handleRemoveUnit = (unitId: string) => {
+    setUnits(units.filter(unit => unit.id !== unitId && !unit.isBase))
+  }
+
+  const handleUnitChange = (unitId: string, field: keyof Unit, value: any) => {
+    setUnits(units.map(unit => 
+      unit.id === unitId 
+        ? { ...unit, [field]: value }
+        : unit
+    ))
+  }
+
+  const handleBaseUnitChange = (newBaseUnit: string) => {
+    setBaseUnit(newBaseUnit)
+    setProductData({ ...productData, base_unit: newBaseUnit })
     
-    if (onSave) {
-      onSave(productToSave)
-    }
+    // Update the base unit in units array
+    setUnits(units.map(unit => 
+      unit.isBase 
+        ? { ...unit, name: newBaseUnit }
+        : unit
+    ))
   }
 
-  const openModal = (type: "variant" | "addon" | "notes" | "description" | "selling") => {
-    setCurrentModal(type)
-    setTempValue("")
-    setModalOpen(true)
-  }
-
-  const handleModalSave = () => {
-    if (!tempValue.trim()) return
-
-    switch (currentModal) {
-      case "variant":
-        setFormData(prev => ({
-          ...prev,
-          variants: [...prev.variants, tempValue]
-        }))
-        break
-      case "addon":
-        setFormData(prev => ({
-          ...prev,
-          addOns: [...prev.addOns, tempValue]
-        }))
-        break
-      case "notes":
-        setFormData(prev => ({ ...prev, notes: tempValue }))
-        break
-      case "description":
-        setFormData(prev => ({ ...prev, description: tempValue }))
-        break
-      case "selling":
-        setFormData(prev => ({ ...prev, sellingMethod: tempValue }))
-        break
-    }
+  const handleProductDataChange = (field: keyof ProductData, value: any) => {
+    setProductData({ ...productData, [field]: value })
     
-    setModalOpen(false)
-    setTempValue("")
+    // Update base unit price when retail price changes
+    if (field === 'price_retail') {
+      setUnits(units.map(unit => 
+        unit.isBase 
+          ? { ...unit, price: value }
+          : unit
+      ))
+    }
   }
 
-  const removeItem = (type: "variant" | "addon", index: number) => {
-    if (type === "variant") {
-      setFormData(prev => ({
-        ...prev,
-        variants: prev.variants.filter((_, i) => i !== index)
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        addOns: prev.addOns.filter((_, i) => i !== index)
-      }))
+  const generateSKU = () => {
+    const timestamp = Date.now().toString().slice(-6)
+    const randomNum = Math.floor(Math.random() * 999).toString().padStart(3, '0')
+    return `PRD${timestamp}${randomNum}`
+  }
+
+  const handleSave = async () => {
+    try {
+      // Create a copy of the product data
+      let finalProductData = { ...productData }
+      
+      // Generate SKU if not provided
+      if (!finalProductData.sku) {
+        finalProductData.sku = generateSKU()
+      }
+
+      // Prepare the product data with units
+      finalProductData = {
+        ...finalProductData,
+        units: units.filter(unit => unit.name.trim() !== '')
+      }
+
+      await onSave(finalProductData)
+    } catch (error) {
+      console.error('Error saving product:', error)
+      alert('Failed to save product. Please try again.')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 max-w-sm mx-auto" data-testid="add-product-component">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center">
-        <Button variant="ghost" size="sm" className="p-2" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-lg font-medium ml-2">Add Product</h1>
-      </div>
-
-      <div className="p-4 space-y-6">
-        {/* Product Preview Card */}
-        <div className="bg-white rounded-lg p-4 flex items-center space-x-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3">
-              <div 
-                className="w-6 h-6 rounded"
-                style={{ backgroundColor: formData.color }}
-              />
-              <span className="text-sm text-gray-500">Color</span>
-            </div>
-          </div>
-          
-          {/* Product Preview */}
-          <div className="relative">
-            <div className="w-32 h-24 bg-gray-200 rounded flex items-center justify-center relative">
-              <Button variant="ghost" size="sm" className="absolute top-1 right-1 p-1">
-                <X className="h-4 w-4" />
-              </Button>
-              <div className="bg-blue-600 text-white px-3 py-1 rounded text-xs absolute bottom-1 left-1 right-1">
-                <div>Product Name</div>
-                <div>Price</div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Photo Controls */}
-          <div className="flex flex-col space-y-2">
-            <Button variant="outline" size="sm" className="p-2">
+      <div className="bg-white px-4 py-4 flex items-center justify-between border-b">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="p-2" onClick={onBack}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Add Product</h1>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="p-2">
+            <X className="h-5 w-5" />
+          </Button>
+          <div className="flex gap-1">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 text-sm rounded">
+              Product Name
+            </Button>
+            <Button variant="ghost" size="sm" className="p-2">
               <ImageIcon className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" className="p-2">
-              <Camera className="h-4 w-4" />
-            </Button>
           </div>
         </div>
+      </div>
 
-        {/* Form Fields */}
-        <div className="space-y-4">
-          <div>
-            <Label className="text-sm text-gray-600">Product Group (Ex. Soft Drinks)</Label>
-            <Input 
-              value={formData.productGroup}
-              onChange={(e) => setFormData(prev => ({ ...prev, productGroup: e.target.value }))}
-              className="mt-1"
+      {/* Content */}
+      <div className="p-4 space-y-6 pb-24">
+        {/* Color Selection */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div 
+              className="w-6 h-4 rounded-sm"
+              style={{ backgroundColor: selectedColor }}
             />
+            <span className="text-sm font-medium">Color</span>
           </div>
-
-          <div>
-            <Label className="text-sm text-gray-600">Product Name (Ex. Coke Mismo 100ML)</Label>
-            <Input 
-              value={formData.productName}
-              onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))}
-              className="mt-1"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <div className="flex-1">
-              <Label className="text-sm text-gray-600">🏷️ Product Code (Optional)</Label>
-              <Input 
-                value={formData.productCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, productCode: e.target.value }))}
-                className="mt-1"
+          <div className="grid grid-cols-6 gap-2">
+            {colors.map((color) => (
+              <button
+                key={color}
+                className={`w-8 h-6 rounded-sm border-2 ${
+                  selectedColor === color ? 'border-gray-800' : 'border-gray-200'
+                }`}
+                style={{ backgroundColor: color }}
+                onClick={() => {
+                  setSelectedColor(color)
+                  handleProductDataChange('color', color)
+                }}
               />
-            </div>
-            <Switch 
-              checked={!!formData.productCode}
-              className="mt-6"
-            />
-          </div>
-
-          {/* Unit of Measure Settings */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-1">Unit of Measure Settings</h3>
-              <p className="text-sm text-gray-500 italic">Configure unique units and pricing for this specific product</p>
-            </div>
-
-            {/* Base Unit */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Base Unit:</Label>
-              <Select 
-                value={formData.units[0]?.name || "piece"}
-                onValueChange={(value) => updateUnit(formData.units[0]?.id, "name", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="piece">Piece</SelectItem>
-                  <SelectItem value="pcs">Pcs</SelectItem>
-                  <SelectItem value="item">Item</SelectItem>
-                  <SelectItem value="unit">Unit</SelectItem>
-                  <SelectItem value="bottle">Bottle</SelectItem>
-                  <SelectItem value="can">Can</SelectItem>
-                  <SelectItem value="pack">Pack</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Additional Units */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium text-gray-700">
-                  Additional Units for this Product (Max 5):
-                </Label>
-                {formData.units.length < 6 && (
-                  <Button onClick={addUnit} size="sm" variant="outline" className="text-xs">
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Unit
-                  </Button>
-                )}
-              </div>
-              
-              {formData.units.filter(unit => !unit.isBase).map((unit, index) => {
-                const unitNumber = index + 2
-                const conversionText = unit.conversionFactor > 1 ? 
-                  `1 ${unit.name} = ${unit.conversionFactor} ${formData.units[0]?.name}(s)` : 
-                  ""
-
-                return (
-                  <div key={unit.id} className="bg-gray-50 p-4 rounded-lg border space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">Unit {unitNumber}</span>
-                        <Badge 
-                          variant={unit.type === "wholesale" ? "default" : "secondary"}
-                          className={`text-xs ${
-                            unit.type === "wholesale" 
-                              ? "bg-blue-100 text-blue-800 hover:bg-blue-200" 
-                              : "bg-green-100 text-green-800 hover:bg-green-200"
-                          }`}
-                        >
-                          {unit.type === "wholesale" ? "W" : "R"}
-                        </Badge>
-                      </div>
-                      <Button 
-                        onClick={() => removeUnit(unit.id)}
-                        size="sm" 
-                        variant="ghost"
-                        className="p-1"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-gray-600">Unit Name:</Label>
-                        <Select 
-                          value={unit.name}
-                          onValueChange={(value) => updateUnit(unit.id, "name", value)}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select unit name" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="box">Box</SelectItem>
-                            <SelectItem value="dozen">Dozen</SelectItem>
-                            <SelectItem value="case">Case</SelectItem>
-                            <SelectItem value="carton">Carton</SelectItem>
-                            <SelectItem value="bundle">Bundle</SelectItem>
-                            <SelectItem value="set">Set</SelectItem>
-                            <SelectItem value="pack">Pack</SelectItem>
-                            <SelectItem value="bag">Bag</SelectItem>
-                            <SelectItem value="bulk">Bulk</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs text-gray-600">
-                          Conversion Factor (How many {formData.units[0]?.name}s in 1 {unit.name}):
-                        </Label>
-                        <Input 
-                          type="number"
-                          value={unit.conversionFactor}
-                          onChange={(e) => updateUnit(unit.id, "conversionFactor", Number(e.target.value))}
-                          placeholder="12"
-                          className="mt-1"
-                          min="1"
-                        />
-                        {conversionText && (
-                          <p className="text-xs text-gray-500 mt-1">{conversionText}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-xs text-gray-600">
-                            Price per {unit.name} ({unit.type === "wholesale" ? "Wholesale" : "Retail"}):
-                          </Label>
-                          <Button
-                            onClick={() => toggleAutoPricing(unit.id)}
-                            size="sm"
-                            variant={unit.isAutoPricing ? "default" : "outline"}
-                            className={`text-xs px-2 py-1 h-6 ${
-                              unit.isAutoPricing 
-                                ? "bg-purple-500 hover:bg-purple-600 text-white" 
-                                : "text-purple-600 border-purple-300"
-                            }`}
-                          >
-                            Auto
-                          </Button>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-500 mr-2">₱</span>
-                          <Input 
-                            type="number"
-                            value={unit.price}
-                            onChange={(e) => updateUnit(unit.id, "price", Number(e.target.value))}
-                            className="flex-1"
-                            disabled={unit.isAutoPricing}
-                            placeholder="0.00"
-                            step="0.01"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs text-gray-600">Type:</Label>
-                        <div className="flex gap-2 mt-1">
-                          <Button
-                            onClick={() => updateUnit(unit.id, "type", "retail")}
-                            size="sm"
-                            variant={unit.type === "retail" ? "default" : "outline"}
-                            className={`flex-1 text-xs ${
-                              unit.type === "retail" 
-                                ? "bg-green-500 hover:bg-green-600" 
-                                : "text-green-600 border-green-300"
-                            }`}
-                          >
-                            Retail
-                          </Button>
-                          <Button
-                            onClick={() => updateUnit(unit.id, "type", "wholesale")}
-                            size="sm"
-                            variant={unit.type === "wholesale" ? "default" : "outline"}
-                            className={`flex-1 text-xs ${
-                              unit.type === "wholesale" 
-                                ? "bg-blue-500 hover:bg-blue-600" 
-                                : "text-blue-600 border-blue-300"
-                            }`}
-                          >
-                            Wholesale
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm text-gray-600">Price (Presyo o SRP)</Label>
-              <Input 
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-sm text-gray-600">Cost (Puhunan)</Label>
-              <Input 
-                type="number"
-                value={formData.cost}
-                onChange={(e) => setFormData(prev => ({ ...prev, cost: Number(e.target.value) }))}
-                className="mt-1"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm text-gray-600">Stocks</Label>
-              <div className="flex items-center mt-1">
-                <Input 
-                  type="number"
-                  value={formData.stocks}
-                  onChange={(e) => setFormData(prev => ({ ...prev, stocks: Number(e.target.value) }))}
-                  className="rounded-r-none"
-                />
-                <div className="bg-gray-100 px-3 py-2 text-sm text-gray-500 border border-l-0 rounded-r">
-                  pcs
-                </div>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm text-gray-600">Low Stock Level</Label>
-              <div className="flex items-center mt-1">
-                <Input 
-                  type="number"
-                  value={formData.lowStockLevel}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lowStockLevel: Number(e.target.value) }))}
-                  className="rounded-r-none"
-                />
-                <div className="bg-gray-100 px-3 py-2 text-sm text-gray-500 border border-l-0 rounded-r">
-                  pcs
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Options */}
-          <div className="grid grid-cols-5 gap-2">
-            {[
-              { label: "Variant", key: "variant" as const },
-              { label: "Add-on", key: "addon" as const },
-              { label: "Notes", key: "notes" as const },
-              { label: "Description", key: "description" as const },
-              { label: "Selling Method", key: "selling" as const }
-            ].map((option) => (
-              <Button
-                key={option.key}
-                variant="outline"
-                size="sm"
-                className="p-3 h-auto flex flex-col items-center text-xs"
-                onClick={() => openModal(option.key)}
-              >
-                <div className="w-8 h-8 bg-gray-100 rounded-full mb-1 flex items-center justify-center">
-                  <Plus className="h-4 w-4 text-gray-500" />
-                </div>
-                {option.label}
-              </Button>
             ))}
           </div>
+        </div>
 
-          {/* Display added items */}
-          {formData.variants.length > 0 && (
-            <div>
-              <Label className="text-sm text-gray-600 mb-2 block">Variants</Label>
-              <div className="flex flex-wrap gap-2">
-                {formData.variants.map((variant, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                    {variant}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="p-0 h-4 w-4"
-                      onClick={() => removeItem("variant", index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
+        {/* Product Group */}
+        <div className="space-y-2">
+          <label className="text-sm text-gray-600">Product Group (Ex. Soft Drinks)</label>
+          <Select onValueChange={(value) => handleProductDataChange('category_id', value)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Product Name */}
+        <div className="space-y-2">
+          <label className="text-sm text-gray-600">Product Name (Ex. Coke Mismo 100ML)</label>
+          <Input
+            value={productData.name}
+            onChange={(e) => handleProductDataChange('name', e.target.value)}
+            placeholder="Enter product name"
+            className="w-full"
+          />
+        </div>
+
+        {/* Product Code */}
+        <div className="space-y-2">
+          <label className="text-sm text-gray-600 flex items-center gap-1">
+            🔗 Product Code (Optional)
+          </label>
+          <Input
+            value={productData.product_code || ''}
+            onChange={(e) => handleProductDataChange('product_code', e.target.value)}
+            placeholder="Enter product code"
+            className="w-full"
+          />
+        </div>
+
+        {/* Unit of Measure Settings */}
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Unit of Measure Settings</h3>
+            <p className="text-sm text-blue-600 italic">Configure unique units and pricing for this specific product</p>
+          </div>
+
+          {/* Base Unit */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Base Unit:</label>
+            <Select value={baseUnit} onValueChange={handleBaseUnitChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {baseUnitOptions.map((unit) => (
+                  <SelectItem key={unit} value={unit}>
+                    {unit}
+                  </SelectItem>
                 ))}
-              </div>
-            </div>
-          )}
+              </SelectContent>
+            </Select>
+          </div>
 
-          {formData.addOns.length > 0 && (
-            <div>
-              <Label className="text-sm text-gray-600 mb-2 block">Add-ons</Label>
-              <div className="flex flex-wrap gap-2">
-                {formData.addOns.map((addon, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                    {addon}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="p-0 h-4 w-4"
-                      onClick={() => removeItem("addon", index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
-                ))}
-              </div>
+          {/* Additional Units */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">
+                Additional Units for this Product (Max 5):
+              </label>
+              {units.length < 7 && (
+                <Button
+                  type="button"
+                  onClick={handleAddUnit}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-sm rounded flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Unit
+                </Button>
+              )}
             </div>
-          )}
 
-          {formData.notes && (
-            <div>
-              <Label className="text-sm text-gray-600 mb-2 block">Notes</Label>
-              <div className="bg-gray-100 p-3 rounded text-sm">{formData.notes}</div>
+            {/* Units List */}
+            <div className="space-y-3">
+              {units.map((unit) => (
+                <div
+                  key={unit.id}
+                  className={`p-3 border rounded-lg ${
+                    unit.isBase ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">
+                      {unit.isBase ? `Base Unit (${unit.name})` : 'Additional Unit'}
+                    </span>
+                    {!unit.isBase && (
+                      <Button
+                        type="button"
+                        onClick={() => handleRemoveUnit(unit.id)}
+                        className="bg-red-500 hover:bg-red-600 text-white p-1 rounded"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {!unit.isBase && (
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="text-xs text-gray-600">Unit Name</label>
+                        <Input
+                          value={unit.name}
+                          onChange={(e) => handleUnitChange(unit.id, 'name', e.target.value)}
+                          placeholder="e.g., Box, Pack"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Conversion Factor</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={unit.conversionFactor}
+                          onChange={(e) => handleUnitChange(unit.id, 'conversionFactor', parseFloat(e.target.value) || 1)}
+                          placeholder="e.g., 12"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-600">Price</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={unit.price}
+                        onChange={(e) => handleUnitChange(unit.id, 'price', parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="text-sm"
+                        disabled={unit.isBase}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Type</label>
+                      <Select
+                        value={unit.type}
+                        onValueChange={(value: 'retail' | 'wholesale') => handleUnitChange(unit.id, 'type', value)}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="wholesale">Wholesale</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        </div>
 
-          {formData.description && (
-            <div>
-              <Label className="text-sm text-gray-600 mb-2 block">Description</Label>
-              <div className="bg-gray-100 p-3 rounded text-sm">{formData.description}</div>
-            </div>
-          )}
-
-          {formData.sellingMethod && (
-            <div>
-              <Label className="text-sm text-gray-600 mb-2 block">Selling Method</Label>
-              <div className="bg-gray-100 p-3 rounded text-sm">{formData.sellingMethod}</div>
-            </div>
-          )}
-
-          {/* Add to Online Store */}
-          <div className="flex items-center justify-between py-2">
-            <Label className="text-base">Add to Online Store</Label>
-            <Switch 
-              checked={formData.addToOnlineStore}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, addToOnlineStore: checked }))}
+        {/* Pricing Section */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm text-gray-600">Price (Presyo o SRP)</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={productData.price_retail}
+              onChange={(e) => handleProductDataChange('price_retail', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              className="w-full"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm text-gray-600">Cost (Puhunan)</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={productData.cost}
+              onChange={(e) => handleProductDataChange('cost', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              className="w-full"
             />
           </div>
         </div>
 
-        {/* Save Button */}
-        <Button 
+        {/* Stock Section */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm text-gray-600">Stocks</label>
+            <div className="relative">
+              <Input
+                type="number"
+                value={productData.stock}
+                onChange={(e) => handleProductDataChange('stock', parseInt(e.target.value) || 0)}
+                placeholder="0"
+                className="w-full pr-12"
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                pcs
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm text-gray-600">Low Stock Level</label>
+            <div className="relative">
+              <Input
+                type="number"
+                value={productData.low_stock_level}
+                onChange={(e) => handleProductDataChange('low_stock_level', parseInt(e.target.value) || 0)}
+                placeholder="0"
+                className="w-full pr-12"
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                pcs
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Options */}
+        <div className="grid grid-cols-5 gap-4">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
+              <Plus className="w-6 h-6 text-gray-600" />
+            </div>
+            <p className="text-xs font-medium text-gray-700">Variant</p>
+          </div>
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
+              <Plus className="w-6 h-6 text-gray-600" />
+            </div>
+            <p className="text-xs font-medium text-gray-700">Add-on</p>
+          </div>
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
+              <Plus className="w-6 h-6 text-gray-600" />
+            </div>
+            <p className="text-xs font-medium text-gray-700">Notes</p>
+          </div>
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
+              <Plus className="w-6 h-6 text-gray-600" />
+            </div>
+            <p className="text-xs font-medium text-gray-700">Description</p>
+          </div>
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
+              <Plus className="w-6 h-6 text-gray-600" />
+            </div>
+            <p className="text-xs font-medium text-gray-700">Selling Method</p>
+          </div>
+        </div>
+
+        {/* Add to Online Store */}
+        <div className="space-y-2">
+          <label className="text-sm text-gray-600">Add to Online Store</label>
+          <div className="bg-gray-100 p-4 rounded-lg">
+            <p className="text-xs text-gray-500">Configure online store settings</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white p-4 border-t">
+        <Button
           onClick={handleSave}
-          className="w-full bg-pink-500 hover:bg-pink-600 text-white py-3 text-lg font-medium mb-20"
-          size="lg"
+          className="w-full bg-pink-500 hover:bg-pink-600 text-white py-4 text-lg font-semibold rounded-lg"
         >
           SAVE
         </Button>
       </div>
-
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
-        <div className="flex justify-around items-center py-3 relative">
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("dashboard")}>
-            <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Home</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("inventory")}>
-            <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Inventory</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
-              <Plus className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("products")}>
-            <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Products</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen?.("pos")}>
-            <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Store</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal for Additional Details */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Add {currentModal === "variant" ? "Variant" : 
-                   currentModal === "addon" ? "Add-on" :
-                   currentModal === "notes" ? "Notes" :
-                   currentModal === "description" ? "Description" :
-                   "Selling Method"}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {currentModal === "notes" || currentModal === "description" ? (
-              <Textarea
-                value={tempValue}
-                onChange={(e) => setTempValue(e.target.value)}
-                placeholder={`Enter ${currentModal}...`}
-                rows={4}
-                className="w-full"
-              />
-            ) : (
-              <Input
-                value={tempValue}
-                onChange={(e) => setTempValue(e.target.value)}
-                placeholder={
-                  currentModal === "variant" ? "e.g., Small, Medium, Large" :
-                  currentModal === "addon" ? "e.g., Extra Cheese, Extra Sauce" :
-                  "Enter selling method..."
-                }
-                className="w-full"
-              />
-            )}
-            
-            <div className="flex gap-2 justify-end">
-              <Button 
-                variant="outline" 
-                onClick={() => setModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleModalSave}
-                disabled={!tempValue.trim()}
-                className="bg-pink-500 hover:bg-pink-600"
-              >
-                Add
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

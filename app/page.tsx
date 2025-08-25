@@ -32,12 +32,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useState, useEffect } from "react"
 import AddProduct from "@/components/add-product"
+
 import { useProducts } from "@/lib/hooks/useProducts"
 import { useCategories } from "@/lib/hooks/useCategories"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useCustomers } from "@/lib/hooks/useCustomers"
 
-function POSScreen({ onBack, products, categories, setCurrentScreen, createTransaction, updateStock }: { onBack: () => void; products: any[]; categories: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">>; createTransaction: any; updateStock: any }) {
+function POSScreen({ onBack, products, categories, setCurrentScreen, createTransaction, updateStock, fetchProducts }: { onBack: () => void; products: any[]; categories: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; createTransaction: any; updateStock: any; fetchProducts: () => Promise<void> }) {
   const [cart, setCart] = useState<{ [key: string]: number }>({})
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
@@ -65,27 +66,33 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
       // Get cart items for transaction
       const cartItems = getCartItems()
       
-      // Create transaction record
-      const transactionData = {
-        items: cartItems,
-        total_amount: totalAmount,
-        payment_method: paymentMethod,
-        payment_option: paymentOption,
-        customer_details: showCustomerDetails ? customerDetails : null,
-        status: paymentMethod === 'credit' ? 'pending' : 'completed',
-        transaction_date: new Date().toISOString()
-      }
+      console.log('Processing transaction:', { cartItems, paymentMethod })
       
-      console.log('Processing transaction:', transactionData)
-      
-      // Call the createTransaction hook
-      const transactionResult = await createTransaction(transactionData)
+      // Call the createTransaction hook with correct parameters
+      const transactionResult = await createTransaction(
+        cartItems,
+        paymentMethod,
+        undefined, // customerId
+        paymentMethod === 'credit', // isCredit
+        0, // serviceFee
+        0, // deliveryFee
+        0, // discount
+        0, // tax
+        showCustomerDetails ? `Customer: ${customerDetails.name}` : undefined // notes
+      )
       
       if (transactionResult.success) {
-        // Update stock for all items in the cart
-        for (const item of cartItems) {
-          await updateStock(item.id, -item.quantity) // Reduce stock by quantity sold
-        }
+        console.log('Transaction successful, stock will update automatically via real-time subscription')
+        
+        // Add a small delay and manual refresh to ensure inventory is updated
+        setTimeout(async () => {
+          try {
+            await fetchProducts()
+            console.log('Products refreshed after transaction')
+          } catch (error) {
+            console.error('Failed to refresh products:', error)
+          }
+        }, 1000) // 1 second delay to allow database updates to complete
         
         // Clear cart after successful transaction
         setCart({})
@@ -150,9 +157,12 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
     return products
       .filter((product) => cart[product.id] > 0)
       .map((product) => ({
-        ...product,
+        product_id: product.id,
+        product_name: product.name,
         quantity: cart[product.id],
-        total: product.price * cart[product.id],
+        unit_name: product.base_unit || 'piece',
+        unit_price: product.price,
+        subtotal: product.price * cart[product.id],
       }))
   }
 
@@ -262,13 +272,13 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
         {/* Receipt Items */}
         <div className="bg-white mx-4 mt-4 rounded-lg overflow-hidden">
           {cartItems.map((item) => (
-            <div key={item.id} className="flex items-center bg-gray-200 border-b border-gray-300 last:border-b-0">
+            <div key={item.product_id} className="flex items-center bg-gray-200 border-b border-gray-300 last:border-b-0">
               <div className="flex-1 p-3">
-                <h3 className="font-medium text-sm">{item.name}</h3>
+                <h3 className="font-medium text-sm">{item.product_name}</h3>
               </div>
               <div className="flex items-center">
                 <button
-                  onClick={() => updateQuantity(item.id, -1)}
+                  onClick={() => updateQuantity(item.product_id, -1)}
                   className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center"
                 >
                   <Minus className="w-4 h-4" />
@@ -281,7 +291,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
                     if (newQty >= 0) {
                       setCart(prev => ({
                         ...prev,
-                        [item.id]: newQty
+                        [item.product_id]: newQty
                       }));
                     }
                   }}
@@ -290,16 +300,16 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
                   step="0.1"
                 />
                 <button
-                  onClick={() => updateQuantity(item.id, 1)}
+                  onClick={() => updateQuantity(item.product_id, 1)}
                   className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-              <div className="w-16 text-center text-sm font-semibold py-2">{item.price.toFixed(2)}</div>
-              <div className="w-16 text-center text-sm font-semibold py-2">{item.total.toFixed(2)}</div>
+              <div className="w-16 text-center text-sm font-semibold py-2">{item.unit_price.toFixed(2)}</div>
+              <div className="w-16 text-center text-sm font-semibold py-2">{item.subtotal.toFixed(2)}</div>
               <button
-                onClick={() => removeItemFromCart(item.id)}
+                onClick={() => removeItemFromCart(item.product_id)}
                 className="w-8 h-8 bg-red-500 text-white flex items-center justify-center mr-2"
               >
                 <X className="w-4 h-4" />
@@ -576,7 +586,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
   )
 }
 
-function InventoryScreen({ products, categories, setProducts, setCurrentScreen }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
+function InventoryScreen({ products, categories, setProducts, setCurrentScreen }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">> }) {
   const [activeTab, setActiveTab] = useState<"list" | "replenishment">("list")
   const [showStockAtCategory, setShowStockAtCategory] = useState(true)
   const [showStockInPOS, setShowStockInPOS] = useState(true)
@@ -834,11 +844,12 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
             <p className="text-xs text-purple-600 font-medium">Inventory</p>
           </div>
 
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("addProduct")}>
-            <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
-              <Plus className="w-8 h-8 text-white" />
+          {/* Add Product Button - Center */}
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
+            <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
+              <Plus className="w-6 h-6 text-white" />
             </div>
-            <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
+            <p className="text-xs text-purple-600 font-medium">Add Product</p>
           </div>
 
           <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
@@ -856,7 +867,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
   )
 }
 
-function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
+function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">> }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [bulkEditMode, setBulkEditMode] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
@@ -872,49 +883,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
     image: "/placeholder.svg",
   })
 
-  const [showAddProductForm, setShowAddProductForm] = useState(false)
-  const [showModernAddProduct, setShowModernAddProduct] = useState(false)
-  const [addProductForm, setAddProductForm] = useState({
-    productGroup: "",
-    productName: "",
-    productCode: "",
-    baseUnit: "piece",
-    price: "",
-    cost: "",
-    stocks: "",
-    lowStockLevel: "",
-    color: "#1e40af",
-    hasVariant: false,
-    hasAddOn: false,
-    hasNotes: false,
-    hasDescription: false,
-    hasSellingMethod: false,
-    addToOnlineStore: true,
-    productCodeEnabled: false,
-    units: [
-      { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
-      { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
-      { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-      { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
-      { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
-    ],
-  })
 
-  const convertToBaseUnit = (quantity: number, fromUnit: string, product: any) => {
-    const unit = product.units.find((u: any) => u.name === fromUnit)
-    return unit ? quantity * unit.conversionFactor : quantity
-  }
-
-  const convertFromBaseUnit = (baseQuantity: number, toUnit: string, product: any) => {
-    const unit = product.units.find((u: any) => u.name === toUnit)
-    return unit ? baseQuantity / unit.conversionFactor : baseQuantity
-  }
-
-  const getUnitPrice = (product: any, unitName: string) => {
-    const unit = product.units.find((u: any) => u.name === unitName)
-    return unit ? unit.price : product.price
-  }
 
   const filteredProducts = products
     .filter(
@@ -977,71 +946,6 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
     setProducts((prev) => prev.filter((product) => !selectedProducts.includes(product.id)))
     setSelectedProducts([])
     setBulkEditMode(false)
-  }
-
-  const handleAddProductClick = () => {
-    setShowModernAddProduct(true)
-  }
-
-  const handleSaveProduct = () => {
-    if (!addProductForm.productName || !addProductForm.price) {
-      alert("Please fill in required fields")
-      return
-    }
-
-    // Calculate prices for other units based on base unit price and conversion factors
-    const basePrice = Number(addProductForm.price)
-    const baseCost = Number(addProductForm.cost) || 0
-
-    const updatedUnits = addProductForm.units.map((unit) => ({
-      ...unit,
-      price: unit.isBase ? basePrice : unit.price || basePrice * unit.conversionFactor * 0.9, // 10% discount for bulk
-    }))
-
-    const newProduct = {
-      id: Math.max(...products.map((p) => p.id)) + 1,
-      name: addProductForm.productName,
-      price: basePrice,
-      stock: Number(addProductForm.stocks) || 0,
-      category: addProductForm.productGroup || "Baby Powder",
-      image: "/diverse-products-still-life.png",
-      baseUnit: addProductForm.baseUnit,
-      cost: baseCost,
-      units: updatedUnits,
-    }
-
-    setProducts((prev) => [...prev, newProduct])
-
-    // Reset form
-    setAddProductForm({
-      productGroup: "",
-      productName: "",
-      productCode: "",
-      baseUnit: "piece",
-      price: "",
-      cost: "",
-      stocks: "",
-      lowStockLevel: "",
-      color: "#1e40af",
-      hasVariant: false,
-      hasAddOn: false,
-      hasNotes: false,
-      hasDescription: false,
-      hasSellingMethod: false,
-      addToOnlineStore: true,
-      productCodeEnabled: false,
-      units: [
-        { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
-        { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-        { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
-        { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-        { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
-        { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
-      ],
-    })
-
-    setShowAddProductForm(false)
-    alert("Product with multi-unit pricing added successfully!")
   }
 
   const handleAddProduct = () => {
@@ -1296,16 +1200,17 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
                 <p className="text-xs text-gray-400">Inventory</p>
               </div>
 
-              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("addProduct")}>
-                <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
-                  <Plus className="w-8 h-8 text-white" />
+              {/* Add Product Button - Center */}
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
+                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
+                  <Plus className="w-6 h-6 text-white" />
                 </div>
-                <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
+                <p className="text-xs text-purple-600 font-medium">Add Product</p>
               </div>
 
               <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
-                <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Products</p>
+                <FileText className="w-6 h-6 text-purple-600 mx-auto mb-1" />
+                <p className="text-xs text-purple-600 font-medium">Products</p>
               </div>
 
               <div className="text-center">
@@ -1320,12 +1225,12 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
 }
 
 export default function Dashboard() {
-  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
+  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "add-product">(
     "dashboard"
   )
   
   // Use Supabase hooks for real data
-  const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock } = useProducts()
+  const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock, fetchProducts } = useProducts()
   const { categories, loading: categoriesLoading, createCategory } = useCategories()
   const { createTransaction } = useTransactions()
   const { customers, createCustomer } = useCustomers()
@@ -1343,536 +1248,51 @@ export default function Dashboard() {
     units: product.units || []
   }))
   
-  // State for add product form
-  const [addProductForm, setAddProductForm] = useState({
-    productGroup: "",
-    productName: "",
-    productCode: "",
-    baseUnit: "piece",
-    price: "",
-    cost: "",
-    stocks: "",
-    lowStockLevel: "",
-    color: "#1e40af",
-    hasVariant: false,
-    hasAddOn: false,
-    hasNotes: false,
-    hasDescription: false,
-    hasSellingMethod: false,
-    addToOnlineStore: true,
-    productCodeEnabled: false,
-    units: [
-      { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
-      { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
-      { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-      { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
-      { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
-    ],
-  })
+  // Handle product updates
+  const setProducts = async (updateFn: any) => {
+    // This is a simplified version - in real app, you'd handle specific updates
+    console.log('Product update requested')
+  }
 
-  // Handle save product function
-  const handleSaveProduct = async () => {
-    if (!addProductForm.productName.trim() || !addProductForm.price) {
-      alert("Please fill in required fields (Product Name and Price)")
-      return
-    }
+  const handleSaveNewProduct = async (productData: any) => {
+    try {
+      // Prepare units for database
+      const units = productData.units.map((unit: any) => ({
+        unit_name: unit.name,
+        conversion_factor: unit.conversionFactor || 1,
+        price: Number(unit.price) || 0,
+        unit_type: unit.type as 'retail' | 'wholesale',
+        is_base_unit: unit.isBase || false,
+        display_order: 0
+      }));
 
-    // Calculate prices for other units based on base unit price and conversion factors
-    const basePrice = Number(addProductForm.price)
-    const baseCost = Number(addProductForm.cost) || 0
+      // Prepare product data without units field
+      const { units: _, ...productToSave } = productData;
+      
+      // Ensure we have a valid SKU
+      if (!productToSave.sku) {
+        productToSave.sku = `PRD${Date.now()}`;
+      }
 
-    const updatedUnits = addProductForm.units.map((unit) => ({
-      ...unit,
-      price: unit.isBase ? basePrice : unit.price || basePrice * unit.conversionFactor * 0.9, // 10% discount for bulk
-    }))
-
-    // Create product data
-    const productData = {
-      name: addProductForm.productName,
-      price_retail: Number(addProductForm.price),
-      price_wholesale: Number(addProductForm.price) * 0.9, // Default wholesale price
-      stock: Number(addProductForm.stocks) || 0,
-      category_id: categories.find(cat => cat.name === addProductForm.productGroup)?.id || null,
-      product_group_id: null,
-      product_code: addProductForm.productCode || null,
-      base_unit: addProductForm.baseUnit,
-      cost: Number(addProductForm.cost) || 0,
-      low_stock_level: Number(addProductForm.lowStockLevel) || 10,
-      sku: `PRD${Date.now()}`,
-      unit: addProductForm.baseUnit,
-      color: addProductForm.color || '#1e40af',
-      has_variants: addProductForm.hasVariant || false,
-      has_addons: addProductForm.hasAddOn || false,
-      notes: null,
-      is_online_store: addProductForm.addToOnlineStore || false,
-      description: null
-    }
-    
-    const result = await createProduct(productData, [])
-    
-    if (result.success) {
-      // Reset form
-      setAddProductForm({
-        productGroup: "",
-        productName: "",
-        productCode: "",
-        baseUnit: "piece",
-        price: "",
-        cost: "",
-        stocks: "",
-        lowStockLevel: "",
-        color: "#1e40af",
-        hasVariant: false,
-        hasAddOn: false,
-        hasNotes: false,
-        hasDescription: false,
-        hasSellingMethod: false,
-        addToOnlineStore: true,
-        productCodeEnabled: false,
-        units: [
-          { name: "piece", conversionFactor: 1, price: "", isBase: true, type: "retail" },
-          { name: "box", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-          { name: "case", conversionFactor: 144, price: "", isBase: false, type: "wholesale" },
-          { name: "dozen", conversionFactor: 12, price: "", isBase: false, type: "wholesale" },
-          { name: "pack", conversionFactor: 6, price: "", isBase: false, type: "wholesale" },
-          { name: "carton", conversionFactor: 288, price: "", isBase: false, type: "wholesale" },
-        ],
-      })
-      setCurrentScreen("dashboard")
-    } else {
-      alert(`Failed to create product: ${result.error}`)
+      const result = await createProduct(productToSave, units);
+      
+      if (result.success) {
+        setCurrentScreen("dashboard")
+      } else {
+        alert(`Failed to create product: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error in handleSaveNewProduct:', error)
+      alert(`Failed to create product: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
-  if (currentScreen === "addProduct") {
-    return (
-      <div className="min-h-screen bg-white max-w-sm mx-auto">
-        {/* Header */}
-        <div className="bg-pink-500 px-6 py-4 flex items-center justify-between">
-          <button onClick={() => setCurrentScreen("dashboard")} className="text-white">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-white text-lg font-medium">Add Product</h1>
-          <div className="w-6" />
-        </div>
 
-        {/* Form Content */}
-        <div className="p-6 space-y-6">
-          {/* Color and Preview Section */}
-          <div className="flex items-start gap-4">
-            {/* Color Picker */}
-            <div className="space-y-2">
-              <label className="block text-sm text-gray-600">Color</label>
-              <div className="space-y-2">
-                <button
-                  className="w-12 h-12 rounded border-2 border-gray-300"
-                  style={{ backgroundColor: addProductForm.color }}
-                  onClick={() => {
-                    const colors = ["#1e40af", "#dc2626", "#059669", "#7c3aed", "#ea580c", "#0891b2"]
-                    const currentIndex = colors.indexOf(addProductForm.color)
-                    const nextColor = colors[(currentIndex + 1) % colors.length]
-                    setAddProductForm((prev) => ({ ...prev, color: nextColor }))
-                  }}
-                />
-              </div>
-
-                  {/* Product Preview */}
-                  <div className="flex-1 relative">
-                    <div className="bg-gray-300 h-32 rounded-lg relative">
-                      <button className="absolute top-2 right-2 text-gray-600">
-                        <X className="w-5 h-5" />
-                      </button>
-                      <div
-                        className="absolute bottom-0 left-0 right-0 h-12 rounded-b-lg flex items-center justify-center text-white font-medium"
-                        style={{ backgroundColor: addProductForm.color }}
-                      >
-                        <div className="text-center">
-                          <div className="text-sm">Product Name</div>
-                          <div className="text-xs">Price</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Photo Options */}
-                  <div className="space-y-2">
-                    <label className="block text-sm text-gray-600">Photo</label>
-                    <div className="space-y-2">
-                      <button className="w-12 h-12 bg-black rounded flex items-center justify-center">
-                        <ImageIcon className="w-6 h-6 text-white" />
-                      </button>
-                      <button className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
-                        <Camera className="w-6 h-6 text-white" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Product Group */}
-                <div>
-                  <label className="block text-gray-700 mb-2">
-                    Product Group <span className="text-gray-400">(Ex. Soft Drinks)</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                    value={addProductForm.productGroup}
-                    onChange={(e) => setAddProductForm((prev) => ({ ...prev, productGroup: e.target.value }))}
-                    placeholder="Enter product group"
-                  />
-                </div>
-
-                {/* Product Name */}
-                <div>
-                  <label className="block text-gray-700 mb-2">
-                    Product Name <span className="text-gray-400">(Ex. Coke Mismo 100ML)</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                    value={addProductForm.productName}
-                    onChange={(e) => setAddProductForm((prev) => ({ ...prev, productName: e.target.value }))}
-                    placeholder="Enter product name"
-                  />
-                </div>
-
-                {/* Product Code */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-purple-600" />
-                    <span className="text-gray-700">Product Code (Optional)</span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setAddProductForm((prev) => ({ ...prev, productCodeEnabled: !prev.productCodeEnabled }))
-                    }
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      addProductForm.productCodeEnabled ? "bg-purple-600" : "bg-gray-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                        addProductForm.productCodeEnabled ? "translate-x-6" : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {addProductForm.productCodeEnabled && (
-                  <input
-                    type="text"
-                    className="w-full p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                    value={addProductForm.productCode}
-                    onChange={(e) => setAddProductForm((prev) => ({ ...prev, productCode: e.target.value }))}
-                    placeholder="Enter product code"
-                  />
-                )}
-
-                {/* Unit of Measurement */}
-                <div>
-                  <label className="block text-gray-700 mb-2">Unit of Measurement:</label>
-                  <div className="relative">
-                    <select
-                      className="w-full p-3 border border-gray-300 rounded bg-white appearance-none pr-10"
-                      value={`${addProductForm.baseUnit} (${addProductForm.baseUnit === "piece" ? "pcs" : addProductForm.baseUnit})`}
-                      onChange={(e) => {
-                        const baseUnit = e.target.value.split(" ")[0]
-                        setAddProductForm((prev) => ({ ...prev, baseUnit }))
-                      }}
-                    >
-                      <option value="piece (pcs)">Per pieces (pcs)</option>
-                      <option value="kilogram (kg)">Per kilogram (kg)</option>
-                      <option value="liter (L)">Per liter (L)</option>
-                      <option value="gram (g)">Per gram (g)</option>
-                      <option value="bottle (btl)">Per bottle (btl)</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-purple-600" />
-                  </div>
-                </div>
-
-                {/* Price and Cost */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 mb-2">
-                      Price <span className="text-gray-400">(Presyo o SRP)</span>
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                      value={addProductForm.price}
-                      onChange={(e) => setAddProductForm((prev) => ({ ...prev, price: e.target.value }))}
-                      placeholder="0.00"
-                      step="0.01"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 mb-2">
-                      Cost <span className="text-gray-400">(Puhunan)</span>
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                      value={addProductForm.cost}
-                      onChange={(e) => setAddProductForm((prev) => ({ ...prev, cost: e.target.value }))}
-                      placeholder="0.00"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                {/* Stocks and Low Stock Level */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 mb-2">Stocks</label>
-                    <div className="flex">
-                      <input
-                        type="number"
-                        className="flex-1 p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                        value={addProductForm.stocks}
-                        onChange={(e) => setAddProductForm((prev) => ({ ...prev, stocks: e.target.value }))}
-                        placeholder="0"
-                      />
-                      <span className="bg-gray-200 px-3 py-3 text-gray-600 text-sm">
-                        {addProductForm.baseUnit === "piece" ? "pcs" : addProductForm.baseUnit}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 mb-2">Low Stock Level</label>
-                    <div className="flex">
-                      <input
-                        type="number"
-                        className="flex-1 p-3 border-b border-gray-300 bg-transparent focus:border-purple-500 focus:outline-none"
-                        value={addProductForm.lowStockLevel}
-                        onChange={(e) => setAddProductForm((prev) => ({ ...prev, lowStockLevel: e.target.value }))}
-                        placeholder="0"
-                      />
-                      <span className="bg-gray-200 px-3 py-3 text-gray-600 text-sm">
-                        {addProductForm.baseUnit === "piece" ? "pcs" : addProductForm.baseUnit}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Multi-Unit of Measure Settings */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-2">Multi-Unit of Measure Settings</h3>
-                  <p className="text-sm text-gray-600 mb-4 italic">
-                    Configure additional units and pricing for wholesale/bulk sales
-                  </p>
-
-                  {/* Additional Units Configuration */}
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-700">Additional Units (Max 5):</h4>
-                    {addProductForm.units.slice(1).map((unit, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-3 bg-white">
-                        <div className="flex items-center justify-between mb-3">
-                          <h5 className="font-medium text-gray-600">Unit {index + 2}</h5>
-                          <span
-                            className={`text-xs px-2 py-1 rounded ${
-                              unit.type === "wholesale" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
-                            }`}
-                          >
-                            {unit.type === "retail" ? "Retail" : "Wholesale"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3">
-                          {/* Unit Name */}
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Unit Name:</label>
-                            <select
-                              className="w-full p-2 border border-gray-300 rounded text-sm"
-                              value={unit.name}
-                              onChange={(e) => {
-                                const newUnits = [...addProductForm.units]
-                                newUnits[index + 1].name = e.target.value
-                                setAddProductForm((prev) => ({ ...prev, units: newUnits }))
-                              }}
-                            >
-                              <option value="box">Box</option>
-                              <option value="case">Case</option>
-                              <option value="dozen">Dozen</option>
-                              <option value="pack">Pack</option>
-                              <option value="carton">Carton</option>
-                              <option value="sack">Sack</option>
-                              <option value="bag">Bag</option>
-                              <option value="bundle">Bundle</option>
-                            </select>
-                          </div>
-
-                          {/* Conversion Factor */}
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">
-                              Conversion (How many {addProductForm.baseUnit}s = 1 {unit.name}):
-                            </label>
-                            <input
-                              type="number"
-                              className="w-full p-2 border border-gray-300 rounded text-sm"
-                              value={unit.conversionFactor}
-                              onChange={(e) => {
-                                const newUnits = [...addProductForm.units]
-                                newUnits[index + 1].conversionFactor = Number(e.target.value) || 1
-                                setAddProductForm((prev) => ({ ...prev, units: newUnits }))
-                              }}
-                              min="1"
-                              step="0.1"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              1 {unit.name} = {unit.conversionFactor} {addProductForm.baseUnit}(s)
-                            </p>
-                          </div>
-
-                          {/* Unit Price */}
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Price per {unit.name}:</label>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-500">₱</span>
-                              <input
-                                type="number"
-                                className="flex-1 p-2 border border-gray-300 rounded text-sm"
-                                value={unit.price}
-                                onChange={(e) => {
-                                  const newUnits = [...addProductForm.units]
-                                  newUnits[index + 1].price = e.target.value
-                                  setAddProductForm((prev) => ({ ...prev, units: newUnits }))
-                                }}
-                                step="0.01"
-                              />
-                              <button
-                                onClick={() => {
-                                  if (addProductForm.price) {
-                                    const basePrice = Number(addProductForm.price)
-                                    const suggestedPrice = basePrice * unit.conversionFactor * 0.9 // 10% bulk discount
-                                    const newUnits = [...addProductForm.units]
-                                    newUnits[index + 1].price = suggestedPrice.toFixed(2)
-                                    setAddProductForm((prev) => ({ ...prev, units: newUnits }))
-                                  }
-                                }}
-                                className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs hover:bg-purple-200"
-                              >
-                                Auto
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Toggle Options */}
-                <div className="grid grid-cols-5 gap-4">
-                  {[
-                    { key: "hasVariant", label: "Variant" },
-                    { key: "hasAddOn", label: "Add-on" },
-                    { key: "hasNotes", label: "Notes" },
-                    { key: "hasDescription", label: "Description" },
-                    { key: "hasSellingMethod", label: "Selling Method" },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="text-center">
-                      <button
-                        onClick={() =>
-                          setAddProductForm((prev) => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))
-                        }
-                        className={`w-12 h-12 rounded-full border-2 mb-2 ${
-                          addProductForm[key as keyof typeof addProductForm]
-                            ? "bg-gray-300 border-gray-400"
-                            : "bg-white border-gray-300"
-                        }`}
-                      >
-                        <div
-                          className={`w-6 h-6 rounded-full mx-auto ${
-                            addProductForm[key as keyof typeof addProductForm] ? "bg-gray-600" : "bg-transparent"
-                          }`}
-                        />
-                      </button>
-                      <div className="text-xs text-gray-600">{label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add to Online Store */}
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-700 text-lg">Add to Online Store</span>
-                  <button
-                    onClick={() => setAddProductForm((prev) => ({ ...prev, addToOnlineStore: !prev.addToOnlineStore }))}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      addProductForm.addToOnlineStore ? "bg-pink-500" : "bg-gray-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                        addProductForm.addToOnlineStore ? "translate-x-6" : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Save Button */}
-                <button
-                  onClick={handleSaveProduct}
-                  className="w-full bg-pink-500 text-white py-4 rounded-lg text-lg font-semibold hover:bg-pink-600 transition-colors"
-                >
-                  SAVE
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
   
-      // Handle product updates
-      const setProducts = async (updateFn: any) => {
-        // This is a simplified version - in real app, you'd handle specific updates
-        console.log('Product update requested')
-      }
-  
-      const handleSaveNewProduct = async (productData: any) => {
-        // Prepare units for database
-        const units = productData.units.map((unit: any) => ({
-          unit_name: unit.name,
-          conversion_factor: unit.conversionFactor || 1,
-          price: Number(unit.price) || 0,
-          unit_type: unit.type as 'retail' | 'wholesale',
-          is_base_unit: unit.isBase || false,
-          display_order: 0
-        }))
-    
-        // Create product in database
-        const result = await createProduct({
-          name: productData.productName,
-          price_retail: Number(productData.price),
-          price_wholesale: Number(productData.price) * 0.9, // Default wholesale price
-          stock: Number(productData.stocks) || 0,
-          category_id: categories.find((cat: any) => cat.name === productData.productGroup)?.id || null,
-          product_group_id: null,
-          product_code: productData.productCode || null,
-          base_unit: productData.baseUnit,
-          cost: Number(productData.cost) || 0,
-          low_stock_level: Number(productData.lowStockLevel) || 10,
-          sku: `PRD${Date.now()}`,
-          unit: productData.baseUnit,
-          color: productData.color || '#1e40af',
-          has_variants: productData.hasVariant || false,
-          has_addons: productData.hasAddOn || false,
-          notes: productData.notes || null,
-          is_online_store: productData.addToOnlineStore || false,
-          description: productData.description || null
-        }, units.filter((u: any) => !u.is_base_unit)) // Don't include base unit as it's implied
-        
-        if (result.success) {
-          setCurrentScreen("dashboard")
-        } else {
-          alert(`Failed to create product: ${result.error}`)
-        }
-      }
-
       if (currentScreen === "pos") {
-        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} />
+        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} fetchProducts={fetchProducts} />
       }
-    
+
       if (currentScreen === "inventory") {
         return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
       }
@@ -1880,15 +1300,9 @@ export default function Dashboard() {
       if (currentScreen === "products") {
         return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
       }
-    
-      if ((currentScreen as string) === "addProduct") {
-        return (
-          <AddProduct 
-            onBack={() => setCurrentScreen("dashboard")} 
-            onSave={handleSaveNewProduct}
-            setCurrentScreen={setCurrentScreen}
-          />
-        )
+
+      if (currentScreen === "add-product") {
+        return <AddProduct onBack={() => setCurrentScreen("dashboard")} onSave={handleSaveNewProduct} />
       }
 
       return (
@@ -1896,19 +1310,19 @@ export default function Dashboard() {
           {/* Header */}
           <div className="bg-white px-4 py-4">
             <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P</span>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">P</span>
+                </div>
+                <span className="text-2xl font-bold text-purple-600">Peddlr</span>
+                <div className="w-6 h-4 bg-gradient-to-b from-blue-500 via-white to-red-500 rounded-sm ml-1"></div>
+              </div>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Account
+              </Button>
             </div>
-            <span className="text-2xl font-bold text-purple-600">Peddlr</span>
-            <div className="w-6 h-4 bg-gradient-to-b from-blue-500 via-white to-red-500 rounded-sm ml-1"></div>
           </div>
-          <Button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Account
-          </Button>
-        </div>
-      </div>
 
       {/* Balance Card */}
       <div className="px-4 mb-6">
@@ -2042,11 +1456,12 @@ export default function Dashboard() {
             <p className="text-xs text-gray-400">Inventory</p>
           </div>
 
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("addProduct")}>
-            <div className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center -mt-6 shadow-lg">
-              <Plus className="w-8 h-8 text-white" />
+          {/* Add Product Button - Center */}
+          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
+            <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
+              <Plus className="w-6 h-6 text-white" />
             </div>
-            <p className="text-xs text-purple-600 font-medium mt-1">Add Product</p>
+            <p className="text-xs text-purple-600 font-medium">Add Product</p>
           </div>
 
           <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
