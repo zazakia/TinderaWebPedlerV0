@@ -30,98 +30,15 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import AddProduct from "@/components/add-product"
+import { useProducts } from "@/lib/hooks/useProducts"
+import { useCategories } from "@/lib/hooks/useCategories"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useCustomers } from "@/lib/hooks/useCustomers"
 
-const initialProducts = [
-  {
-    id: 1,
-    name: "Johnson's Baby Powder",
-    stock: 94,
-    price: 127.0,
-    image: "/placeholder-tnj8h.png",
-    category: "Baby Powder",
-    baseUnit: "piece",
-    cost: 100.0,
-    units: [
-      { name: "piece", conversionFactor: 1, price: 127.0, isBase: true, type: "retail" },
-      { name: "box", conversionFactor: 12, price: 1400.0, isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 144, price: 16000.0, isBase: false, type: "wholesale" },
-      { name: "dozen", conversionFactor: 12, price: 1350.0, isBase: false, type: "wholesale" },
-      { name: "pack", conversionFactor: 6, price: 720.0, isBase: false, type: "wholesale" },
-      { name: "carton", conversionFactor: 288, price: 31000.0, isBase: false, type: "wholesale" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Johnson's Powder",
-    stock: 33,
-    price: 67.0,
-    image: "/powder-bottle.png",
-    category: "Baby Powder",
-    baseUnit: "piece",
-    cost: 50.0,
-    units: [
-      { name: "piece", conversionFactor: 1, price: 67.0, isBase: true, type: "retail" },
-      { name: "box", conversionFactor: 12, price: 750.0, isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 144, price: 8500.0, isBase: false, type: "wholesale" },
-      { name: "dozen", conversionFactor: 12, price: 720.0, isBase: false, type: "wholesale" },
-      { name: "pack", conversionFactor: 6, price: 380.0, isBase: false, type: "wholesale" },
-      { name: "carton", conversionFactor: 288, price: 16500.0, isBase: false, type: "wholesale" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Cbti Ready-To-Drink",
-    stock: 42,
-    price: 83.0,
-    image: "/drink-bottle.png",
-    category: "Coffee and Creamer",
-    baseUnit: "bottle",
-    cost: 65.0,
-    units: [
-      { name: "bottle", conversionFactor: 1, price: 83.0, isBase: true, type: "retail" },
-      { name: "pack", conversionFactor: 6, price: 470.0, isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 24, price: 1800.0, isBase: false, type: "wholesale" },
-      { name: "box", conversionFactor: 12, price: 950.0, isBase: false, type: "wholesale" },
-      { name: "tray", conversionFactor: 48, price: 3500.0, isBase: false, type: "wholesale" },
-      { name: "pallet", conversionFactor: 1200, price: 85000.0, isBase: false, type: "wholesale" },
-    ],
-  },
-  {
-    id: 4,
-    name: "TANG orange 25g",
-    stock: 43,
-    price: 24.0,
-    image: "/tang-orange-powder-packet.png",
-    category: "Powder Drink",
-    baseUnit: "sachet",
-    cost: 18.0,
-    units: [
-      { name: "sachet", conversionFactor: 1, price: 24.0, isBase: true, type: "retail" },
-      { name: "pack", conversionFactor: 10, price: 220.0, isBase: false, type: "wholesale" },
-      { name: "box", conversionFactor: 100, price: 2100.0, isBase: false, type: "wholesale" },
-      { name: "case", conversionFactor: 1000, price: 20000.0, isBase: false, type: "wholesale" },
-      { name: "bundle", conversionFactor: 50, price: 1100.0, isBase: false, type: "wholesale" },
-      { name: "carton", conversionFactor: 2000, price: 38000.0, isBase: false, type: "wholesale" },
-    ],
-  },
-]
-
-const categories = [
-  { name: "All", active: true },
-  { name: "Baby Powder", active: false },
-  { name: "Coffee and Creamer", active: false },
-  { name: "Powder Drink", active: false },
-]
-
-function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void; products: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
-  const [cart, setCart] = useState<{ [key: number]: number }>({
-    1: 2.0,
-    2: 1.0,
-    3: 1.0,
-    4: 0.0,
-  })
+function POSScreen({ onBack, products, categories, setCurrentScreen, createTransaction, updateStock }: { onBack: () => void; products: any[]; categories: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">>; createTransaction: any; updateStock: any }) {
+  const [cart, setCart] = useState<{ [key: string]: number }>({})
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [posScreen, setPosScreen] = useState<"pos" | "receipt" | "payment">("pos")
@@ -133,8 +50,67 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
   })
   const [paymentOption, setPaymentOption] = useState<"pay-later" | "multi-payment">("pay-later")
   const [showCustomerDetails, setShowCustomerDetails] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  const updateQuantity = (productId: number, change: number) => {
+  // Handle payment transaction processing
+  const handleTransaction = async (paymentMethod: 'cash' | 'credit') => {
+    if (totalItems === 0) {
+      alert('Cart is empty. Please add items before processing payment.')
+      return
+    }
+    
+    setIsProcessing(true)
+    
+    try {
+      // Get cart items for transaction
+      const cartItems = getCartItems()
+      
+      // Create transaction record
+      const transactionData = {
+        items: cartItems,
+        total_amount: totalAmount,
+        payment_method: paymentMethod,
+        payment_option: paymentOption,
+        customer_details: showCustomerDetails ? customerDetails : null,
+        status: paymentMethod === 'credit' ? 'pending' : 'completed',
+        transaction_date: new Date().toISOString()
+      }
+      
+      console.log('Processing transaction:', transactionData)
+      
+      // Call the createTransaction hook
+      const transactionResult = await createTransaction(transactionData)
+      
+      if (transactionResult.success) {
+        // Update stock for all items in the cart
+        for (const item of cartItems) {
+          await updateStock(item.id, -item.quantity) // Reduce stock by quantity sold
+        }
+        
+        // Clear cart after successful transaction
+        setCart({})
+        
+        // Reset customer details
+        setCustomerDetails({ name: '', number: '', address: '', notes: '' })
+        setShowCustomerDetails(false)
+        
+        // Show success message
+        alert(`Transaction completed successfully! ${paymentMethod === 'credit' ? 'Credit payment recorded.' : 'Cash payment processed.'}`)
+        
+        // Go to receipt view
+        setPosScreen('receipt')
+      } else {
+        throw new Error(transactionResult.error || 'Transaction failed')
+      }
+    } catch (error) {
+      console.error('Transaction error:', error)
+      alert(`Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const updateQuantity = (productId: string, change: number) => {
     setCart((prev) => {
       const currentQty = prev[productId] || 0
       const newQty = Math.max(0, currentQty + change)
@@ -142,15 +118,15 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
     })
   }
 
-  const addToCart = (productId: number) => {
+  const addToCart = (productId: string) => {
     updateQuantity(productId, 1)
   }
 
-  const removeFromCart = (productId: number) => {
+  const removeFromCart = (productId: string) => {
     updateQuantity(productId, -1)
   }
 
-  const removeItemFromCart = (productId: number) => {
+  const removeItemFromCart = (productId: string) => {
     setCart((prev) => ({ ...prev, [productId]: 0 }))
   }
 
@@ -166,8 +142,7 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory =
       activeCategory === "All" ||
-      (activeCategory === "Baby Powder" && product.name.includes("Powder")) ||
-      (activeCategory === "Powder Drink" && product.name.includes("TANG"))
+      product.category === activeCategory
     return matchesSearch && matchesCategory
   })
 
@@ -232,18 +207,20 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
           {/* Payment Method Buttons */}
           <div className="space-y-6">
             <Button 
-              onClick={() => setPosScreen("receipt")}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200"
+              onClick={() => handleTransaction("cash")}
+              disabled={isProcessing}
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
             >
-              Cash
+              {isProcessing ? 'Processing...' : 'Cash'}
             </Button>
             <Button 
-              onClick={() => setPosScreen("receipt")}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200"
+              onClick={() => handleTransaction("credit")}
+              disabled={isProcessing}
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
             >
               <div className="text-center">
-                <div className="text-2xl">Credit</div>
-                <div className="text-lg opacity-90 font-medium">UTANG</div>
+                <div className="text-2xl">{isProcessing ? 'Processing...' : 'Credit'}</div>
+                {!isProcessing && <div className="text-lg opacity-90 font-medium">UTANG</div>}
               </div>
             </Button>
           </div>
@@ -455,9 +432,17 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
       <div className="flex pb-32">
         {/* Sidebar */}
         <div className="w-32 bg-white">
-          {categories.map((category, index) => (
+          <div
+            onClick={() => setActiveCategory("All")}
+            className={`px-3 py-4 text-sm border-b cursor-pointer ${
+              activeCategory === "All" ? "bg-pink-500 text-white" : "text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            All
+          </div>
+          {categories.map((category) => (
             <div
-              key={index}
+              key={category.id}
               onClick={() => setActiveCategory(category.name)}
               className={`px-3 py-4 text-sm border-b cursor-pointer ${
                 activeCategory === category.name ? "bg-pink-500 text-white" : "text-gray-700 hover:bg-gray-50"
@@ -591,7 +576,7 @@ function POSScreen({ onBack, products, setCurrentScreen }: { onBack: () => void;
   )
 }
 
-function InventoryScreen({ products, setProducts, setCurrentScreen }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
+function InventoryScreen({ products, categories, setProducts, setCurrentScreen }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "addProduct">> }) {
   const [activeTab, setActiveTab] = useState<"list" | "replenishment">("list")
   const [showStockAtCategory, setShowStockAtCategory] = useState(true)
   const [showStockInPOS, setShowStockInPOS] = useState(true)
@@ -1084,7 +1069,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
   return (
     <div className="min-h-screen bg-gray-100 max-w-sm mx-auto">
       {/* Products Screen */}
-        <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50">
           {/* Header */}
           <div className="bg-white px-4 py-3 flex items-center justify-between border-b">
             <div className="flex items-center gap-4">
@@ -1330,12 +1315,6 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
             </div>
           </div>
         </div>
-      )}
-
-      {showAddProductForm && (
-        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-          {/* Add Product Screen */}
-          {currentScreen === "addProduct" && (
             <div className="min-h-screen bg-gray-50">
               {/* Header */}
               <div className="bg-white px-4 py-3 flex items-center border-b">
@@ -2051,34 +2030,84 @@ export default function Dashboard() {
   const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
     "dashboard",
   )
-  const [products, setProducts] = useState(initialProducts)
+  
+  // Use Supabase hooks for real data
+  const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock } = useProducts()
+  const { categories, loading: categoriesLoading, createCategory } = useCategories()
+  const { createTransaction } = useTransactions()
+  const { customers, createCustomer } = useCustomers()
+  
+  // Transform database products to match the component structure
+  const products = dbProducts.map(product => ({
+    id: product.id,
+    name: product.name,
+    stock: product.stock,
+    price: product.price_retail,
+    image: product.image_url || "/placeholder.svg",
+    category: categories.find(cat => cat.id === product.category_id)?.name || "General",
+    baseUnit: product.base_unit,
+    cost: product.cost,
+    units: product.units?.map(unit => ({
+      name: unit.unit_name,
+      conversionFactor: unit.conversion_factor,
+      price: unit.price,
+      isBase: unit.is_base_unit,
+      type: unit.unit_type
+    })) || []
+  }))
 
-  const handleSaveNewProduct = (productData: any) => {
-    const newProduct = {
-      id: Math.max(...products.map((p) => p.id)) + 1,
+  const handleSaveNewProduct = async (productData: any) => {
+    // Prepare units for database
+    const units = productData.units.map((unit: any) => ({
+      unit_name: unit.name,
+      conversion_factor: unit.conversionFactor || 1,
+      price: Number(unit.price) || 0,
+      unit_type: unit.type as 'retail' | 'wholesale',
+      is_base_unit: unit.isBase || false,
+      display_order: 0
+    }))
+
+    // Create product in database
+    const result = await createProduct({
       name: productData.productName,
-      price: Number(productData.price),
+      price_retail: Number(productData.price),
+      price_wholesale: Number(productData.price) * 0.9, // Default wholesale price
       stock: Number(productData.stocks) || 0,
-      category: productData.productGroup || "General",
-      image: "/placeholder.svg",
-      baseUnit: productData.baseUnit,
+      category_id: categories.find(cat => cat.name === productData.productGroup)?.id || null,
+      product_group_id: null,
+      product_code: productData.productCode || null,
+      base_unit: productData.baseUnit,
       cost: Number(productData.cost) || 0,
-      units: productData.units.map((unit: any) => ({
-        ...unit,
-        price: Number(unit.price) || 0
-      }))
-    }
+      low_stock_level: Number(productData.lowStockLevel) || 10,
+      sku: `PRD${Date.now()}`,
+      unit: productData.baseUnit,
+      color: productData.color || '#1e40af',
+      has_variants: productData.hasVariant || false,
+      has_addons: productData.hasAddOn || false,
+      notes: productData.notes || null,
+      is_online_store: productData.addToOnlineStore || false,
+      description: productData.description || null
+    }, units.filter(u => !u.is_base_unit)) // Don't include base unit as it's implied
     
-    setProducts(prev => [...prev, newProduct])
-    setCurrentScreen("dashboard")
+    if (result.success) {
+      setCurrentScreen("dashboard")
+    } else {
+      alert(`Failed to create product: ${result.error}`)
+    }
+  }
+  
+  // Handle product updates
+  const setProducts = async (updateFn: any) => {
+    // This is a simplified version - in real app, you'd handle specific updates
+    console.log('Product update requested')
   }
 
   if (currentScreen === "pos") {
-    return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} setCurrentScreen={setCurrentScreen} />
+    return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} />
   }
 
   if (currentScreen === "inventory") {
-    return <InventoryScreen products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
+    return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
   }
 
   if (currentScreen === "products") {
