@@ -45,7 +45,7 @@ interface AddProductProps {
   onSave: (productData: ProductData) => Promise<void>
 }
 
-export default function AddProductScreen({ onBack, onSave }: AddProductProps) {
+export default function AddProduct({ onBack, onSave }: AddProductProps) {
   const [selectedColor, setSelectedColor] = useState('#1e40af')
   const [baseUnit, setBaseUnit] = useState('Piece')
   const [units, setUnits] = useState<Unit[]>([])
