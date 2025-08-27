@@ -372,7 +372,7 @@ describe('Dashboard Component - Integration Tests', () => {
   describe('Error Handling and Edge Cases', () => {
     it('should handle empty product list', () => {
       // Mock empty products
-      jest.doMock('../../lib/hooks/useProducts', () => ({
+      jest.mock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -382,7 +382,7 @@ describe('Dashboard Component - Integration Tests', () => {
           updateStock: jest.fn(),
           fetchProducts: jest.fn(), // Add the missing fetchProducts function
         }),
-      }))
+      }), { virtual: true })
 
       renderWithAuth(<Dashboard />)
       
@@ -392,7 +392,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
     it('should handle loading states', () => {
       // Mock loading state
-      jest.doMock('../../lib/hooks/useProducts', () => ({
+      jest.mock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: true,
@@ -402,7 +402,7 @@ describe('Dashboard Component - Integration Tests', () => {
           updateStock: jest.fn(),
           fetchProducts: jest.fn(), // Add the missing fetchProducts function
         }),
-      }))
+      }), { virtual: true })
 
       renderWithAuth(<Dashboard />)
       

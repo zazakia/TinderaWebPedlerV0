@@ -456,7 +456,7 @@ describe('Regression Tests - Critical Functionality', () => {
   describe('Error Recovery and Resilience', () => {
     it('REGRESSION: Application must recover from hook errors', () => {
       // Mock error in useProducts
-      jest.doMock('../../lib/hooks/useProducts', () => ({
+      jest.mock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -467,7 +467,7 @@ describe('Regression Tests - Critical Functionality', () => {
           updateStock: jest.fn(),
           fetchProducts: jest.fn(),
         }),
-      }))
+      }), { virtual: true })
 
       expect(() => {
         renderWithAuth(<Dashboard />)
@@ -478,7 +478,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
     it('REGRESSION: Application must handle missing data gracefully', () => {
       // Mock empty data
-      jest.doMock('../../lib/hooks/useProducts', () => ({
+      jest.mock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -488,15 +488,15 @@ describe('Regression Tests - Critical Functionality', () => {
           updateStock: jest.fn(),
           fetchProducts: jest.fn(),
         }),
-      }))
+      }), { virtual: true })
 
-      jest.doMock('../../lib/hooks/useCategories', () => ({
+      jest.mock('../../lib/hooks/useCategories', () => ({
         useCategories: () => ({
           categories: [],
           loading: false,
           createCategory: jest.fn(),
         }),
-      }))
+      }), { virtual: true })
 
       renderWithAuth(<Dashboard />)
 

@@ -1285,296 +1285,265 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handl
     <div className="min-h-screen bg-gray-100 max-w-sm mx-auto">
       {/* Products Screen */}
       <div className="min-h-screen bg-gray-50">
-          {/* Header */}
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-b">
-            <div className="flex items-center gap-4">
-              <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} role="button" aria-label="Back" />
-              <h1 className="text-2xl font-bold text-gray-800">PRODUCTS</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                className="flex flex-col items-center"
-              >
-                <span className="text-sm font-bold">A</span>
-                <span className="text-xs">Z</span>
-                {sortOrder === "desc" && <span className="text-xs">↓</span>}
-                {sortOrder === "asc" && <span className="text-xs">↑</span>}
-              </button>
-              <div className="flex items-center gap-1">
-                <span className="text-lg">₱</span>
-                <div className="flex flex-col">
-                  <div className="w-3 h-1 bg-gray-400"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-      <div className="bg-white px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} aria-label="Back" title="Back">
-            <ArrowLeft className="w-6 h-6 cursor-pointer" />
-          </button>
-          <h1 className="text-xl font-semibold">POS</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-gray-100 p-2 rounded">
-              <Search className="w-5 h-5 text-gray-500" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search products"
-              className="border-none outline-none"
-            />
+        {/* Header */}
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-b">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} aria-label="Back" title="Back">
+              <ArrowLeft className="w-6 h-6 cursor-pointer" />
+            </button>
+            <h1 className="text-2xl font-bold text-gray-800">PRODUCTS</h1>
           </div>
-          <div className="bg-purple-600 p-2 rounded">
-            <BarChart3 className="w-5 h-5 text-white" />
-          </div>
-        </div>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <span className="text-lg">₱</span>
-                <div className="flex flex-col">
-                  <div className="w-3 h-1 bg-gray-400"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-                </div>
-              </div>
-              <div className="bg-purple-600 p-2 rounded">
-                <BarChart3 className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <span className="text-lg">₱</span>
-                <div className="flex flex-col">
-                  <div className="w-3 h-1 bg-gray-400"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
-                </div>
-              </div>
-              <div className="bg-purple-600 p-2 rounded">
-                <BarChart3 className="w-5 h-5 text-white" />
-              </div>
-            </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bulk Edit and Search */}
-          <div className="flex gap-3 mb-4 px-4">
-            <Button
-              onClick={() => setBulkEditMode(!bulkEditMode)}
-              className={`${bulkEditMode ? "bg-red-500 hover:bg-red-600" : "bg-purple-600 hover:bg-purple-700"} text-white px-4 py-2 rounded-lg flex items-center gap-2`}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              className="flex flex-col items-center"
             >
-              <Edit className="w-4 h-4" />
-              {bulkEditMode ? "CANCEL" : "BULK EDIT"}
+              <span className="text-sm font-bold">A</span>
+              <span className="text-xs">Z</span>
+              {sortOrder === "desc" && <span className="text-xs">↓</span>}
+              {sortOrder === "asc" && <span className="text-xs">↑</span>}
+            </button>
+            <div className="flex items-center gap-1">
+              <span className="text-lg">₱</span>
+              <div className="flex flex-col">
+                <div className="w-3 h-1 bg-gray-400"></div>
+                <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+                <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bulk Edit and Search */}
+        <div className="flex gap-3 mb-4 px-4">
+          <Button
+            onClick={() => setBulkEditMode(!bulkEditMode)}
+            className={`${bulkEditMode ? "bg-red-500 hover:bg-red-600" : "bg-purple-600 hover:bg-purple-700"} text-white px-4 py-2 rounded-lg flex items-center gap-2`}
+          >
+            <Edit className="w-4 h-4" />
+            {bulkEditMode ? "CANCEL" : "BULK EDIT"}
+          </Button>
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search for ..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10 border-gray-300"
+            />
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Bulk Actions */}
+        {bulkEditMode && selectedProducts.length > 0 && (
+          <div className="mb-4 p-3 bg-red-50 rounded-lg mx-4">
+            <p className="text-sm text-red-600 mb-2">{selectedProducts.length} products selected</p>
+            <Button
+              onClick={handleBulkDelete}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+            >
+              Delete Selected
             </Button>
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          </div>
+        )}
+
+        {/* Add Product Form */}
+        {showAddForm && (
+          <div className="bg-white mx-4 mb-4 p-4 rounded-lg shadow">
+            <h3 className="font-semibold mb-3">Add New Product</h3>
+            <div className="space-y-3">
               <Input
-                placeholder="Search for ..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10 border-gray-300"
+                placeholder="Product name"
+                value={newProductForm.name}
+                onChange={(e) => setNewProductForm((prev) => ({ ...prev, name: e.target.value }))}
               />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            </div>
-          </div>
-
-          {/* Bulk Actions */}
-          {bulkEditMode && selectedProducts.length > 0 && (
-            <div className="mb-4 p-3 bg-red-50 rounded-lg mx-4">
-              <p className="text-sm text-red-600 mb-2">{selectedProducts.length} products selected</p>
-              <Button
-                onClick={handleBulkDelete}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+              <Input
+                type="number"
+                placeholder="Price"
+                value={newProductForm.price}
+                onChange={(e) => setNewProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+              />
+              <Input
+                type="number"
+                placeholder="Stock"
+                value={newProductForm.stock}
+                onChange={(e) => setNewProductForm((prev) => ({ ...prev, stock: Number(e.target.value) }))}
+              />
+              <select
+                value={newProductForm.category}
+                onChange={(e) => setNewProductForm((prev) => ({ ...prev, category: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded"
               >
-                Delete Selected
-              </Button>
-            </div>
-          )}
-
-          {/* Add Product Form */}
-          {showAddForm && (
-            <div className="bg-white mx-4 mb-4 p-4 rounded-lg shadow">
-              <h3 className="font-semibold mb-3">Add New Product</h3>
-              <div className="space-y-3">
-                <Input
-                  placeholder="Product name"
-                  value={newProductForm.name}
-                  onChange={(e) => setNewProductForm((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <Input
-                  type="number"
-                  placeholder="Price"
-                  value={newProductForm.price}
-                  onChange={(e) => setNewProductForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
-                />
-                <Input
-                  type="number"
-                  placeholder="Stock"
-                  value={newProductForm.stock}
-                  onChange={(e) => setNewProductForm((prev) => ({ ...prev, stock: Number(e.target.value) }))}
-                />
-                <select
-                  value={newProductForm.category}
-                  onChange={(e) => setNewProductForm((prev) => ({ ...prev, category: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded"
+                <option value="Baby Powder">Baby Powder</option>
+                <option value="Coffee and Creamer">Coffee and Creamer</option>
+                <option value="Powder Drink">Powder Drink</option>
+              </select>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleAddProduct}
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
                 >
-                  <option value="Baby Powder">Baby Powder</option>
-                  <option value="Coffee and Creamer">Coffee and Creamer</option>
-                  <option value="Powder Drink">Powder Drink</option>
-                </select>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleAddProduct}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                  >
-                    Add Product
-                  </Button>
-                  <Button
-                    onClick={() => setShowAddForm(false)}
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
-                  >
-                    Cancel
-                  </Button>
-                </div>
+                  Add Product
+                </Button>
+                <Button
+                  onClick={() => setShowAddForm(false)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
-          )}
-
-          {/* Products List */}
-          <div className="px-4 pb-24">
-            {Object.entries(groupedProducts).map(([category, categoryProducts]) => (
-              <div key={category} className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-700 mb-3">{category}</h2>
-                <div className="space-y-3">
-                  {(categoryProducts as any[]).map((product: any) => (
-                    <div key={product.id} className="bg-white rounded-lg p-3 flex items-center gap-3">
-                      {bulkEditMode && (
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.includes(product.id)}
-                          onChange={() => toggleProductSelection(product.id)}
-                          className="w-4 h-4"
-                        />
-                      )}
-
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <img
-                          src={product.image || "/placeholder.svg"}
-                          alt={product.name}
-                          className="w-8 h-8 object-contain"
-                        />
-                      </div>
-
-                      {editingProduct === product.id ? (
-                        <div className="flex-1 space-y-2">
-                          <Input
-                            value={editForm.name}
-                            onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                            className="text-sm"
-                          />
-                          <div className="flex gap-2">
-                            <Input
-                              type="number"
-                              value={editForm.price}
-                              onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
-                              className="text-sm"
-                              placeholder="Price"
-                            />
-                            <Input
-                              type="number"
-                              value={editForm.stock}
-                              onChange={(e) => setEditForm((prev) => ({ ...prev, stock: Number(e.target.value) }))}
-                              className="text-sm"
-                              placeholder="Stock"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={handleSaveEdit}
-                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-xs"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              onClick={() => setEditingProduct(null)}
-                              className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-800">{product.name}</h3>
-                          <p className="text-lg font-bold text-gray-900">₱{(product.price || 0).toFixed(2)}</p>
-                          <p className="text-xs text-gray-500">Stock: {product.stock}</p>
-                        </div>
-                      )}
-
-                      {!bulkEditMode && editingProduct !== product.id && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditProductLocal(product)}
-                            className="w-8 h-8 bg-blue-500 text-white rounded flex items-center justify-center"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProductLocal(product.id)}
-                            className="w-8 h-8 bg-red-500 text-white rounded flex items-center justify-center"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const result = await handleDuplicateProduct(product)
-                                if (result.success) {
-                                  alert('Product duplicated successfully!')
-                                } else {
-                                  alert(`Failed to duplicate product: ${result.error}`)
-                                }
-                              } catch (error) {
-                                console.error('Error duplicating product:', error)
-                                alert(`Failed to duplicate product: ${error instanceof Error ? error.message : 'Unknown error'}`)
-                              }
-                            }}
-                            className="w-8 h-8 bg-gray-500 text-white rounded flex items-center justify-center"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
+        )}
 
-          {/* Bottom Navigation */}
-          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
-            <div className="flex justify-around items-center py-3 relative">
-              <div className="text-center cursor-pointer hover:opacity-80" onClick={onBack}>
-                <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Home</p>
-              </div>
+        {/* Products List */}
+        <div className="px-4 pb-24">
+          {Object.entries(groupedProducts).map(([category, categoryProducts]) => (
+            <div key={category} className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700 mb-3">{category}</h2>
+              <div className="space-y-3">
+                {(categoryProducts as any[]).map((product: any) => (
+                  <div key={product.id} className="bg-white rounded-lg p-3 flex items-center gap-3">
+                    {bulkEditMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.includes(product.id)}
+                        onChange={() => toggleProductSelection(product.id)}
+                        className="w-4 h-4"
+                      />
+                    )}
 
-              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
-                <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Inventory</p>
-              </div>
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <img
+                        src={product.image || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-8 h-8 object-contain"
+                      />
+                    </div>
 
-              {/* Add Product Button - Center */}
-              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
-                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-                <p className="text-xs text-purple-600 font-medium">Add Product</p>
+                    {editingProduct === product.id ? (
+                      <div className="flex-1 space-y-2">
+                        <Input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                          className="text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            value={editForm.price}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                            className="text-sm"
+                            placeholder="Price"
+                          />
+                          <Input
+                            type="number"
+                            value={editForm.stock}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, stock: Number(e.target.value) }))}
+                            className="text-sm"
+                            placeholder="Stock"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handleSaveEdit}
+                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-xs"
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            onClick={() => setEditingProduct(null)}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 text-xs"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-800">{product.name}</h3>
+                        <p className="text-lg font-bold text-gray-900">₱{(product.price || 0).toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                      </div>
+                    )}
+
+                    {!bulkEditMode && editingProduct !== product.id && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditProductLocal(product)}
+                          className="w-8 h-8 bg-blue-500 text-white rounded flex items-center justify-center"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProductLocal(product.id)}
+                          className="w-8 h-8 bg-red-500 text-white rounded flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const result = await handleDuplicateProduct(product)
+                              if (result.success) {
+                                alert('Product duplicated successfully!')
+                              } else {
+                                alert(`Failed to duplicate product: ${result.error}`)
+                              }
+                            } catch (error) {
+                              console.error('Error duplicating product:', error)
+                              alert(`Failed to duplicate product: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                            }
+                          }}
+                          className="w-8 h-8 bg-gray-500 text-white rounded flex items-center justify-center"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
+          <div className="flex justify-around items-center py-3 relative">
+            <div className="text-center cursor-pointer hover:opacity-80" onClick={onBack}>
+              <Home className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+              <p className="text-xs text-gray-400">Home</p>
+            </div>
+
+            <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
+              <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+              <p className="text-xs text-gray-400">Inventory</p>
+            </div>
+
+            {/* Add Product Button - Center */}
+            <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
+              <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-xs text-purple-600 font-medium">Add Product</p>
+            </div>
+
+            <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
+              <FileText className="w-6 h-6 text-purple-600 mx-auto mb-1" />
+              <p className="text-xs text-purple-600 font-medium">Products</p>
+            </div>
+
+            <div className="text-center">
+              <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+              <p className="text-xs text-gray-400">Store</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
               <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
                 <FileText className="w-6 h-6 text-purple-600 mx-auto mb-1" />
