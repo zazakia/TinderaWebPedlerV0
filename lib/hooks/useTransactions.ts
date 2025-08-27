@@ -26,13 +26,13 @@ export function useTransactions() {
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Fetch all transactions
-  const fetchTransactions = async (limit = 50) => {
+  // Fetch all transactions with optional location filter
+  const fetchTransactions = async (limit = 50, locationId?: string) => {
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('transactions')
         .select(`
           *,
@@ -41,6 +41,13 @@ export function useTransactions() {
         `)
         .order('created_at', { ascending: false })
         .limit(limit)
+      
+      // Add location filter if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setTransactions(data || [])
@@ -52,7 +59,7 @@ export function useTransactions() {
     }
   }
 
-  // Create a new transaction
+  // Create a new transaction with location support
   const createTransaction = async (
     cartItems: CartItem[],
     paymentMethod: string,
@@ -62,7 +69,8 @@ export function useTransactions() {
     deliveryFee: number = 0,
     discount: number = 0,
     tax: number = 0,
-    notes?: string
+    notes?: string,
+    locationId?: string
   ) => {
     try {
       // Calculate totals
@@ -89,6 +97,7 @@ export function useTransactions() {
         payment_method: paymentMethod,
         is_credit: isCredit,
         notes,
+        location_id: locationId,
         status: 'completed'
       }
 
@@ -125,7 +134,7 @@ export function useTransactions() {
         }
       }
 
-      await fetchTransactions() // Refresh the transactions list
+      await fetchTransactions(50, locationId) // Refresh the transactions list
       return { success: true, data: newTransaction }
     } catch (err) {
       console.error('Error creating transaction:', err)
@@ -154,13 +163,13 @@ export function useTransactions() {
     }
   }
 
-  // Get today's transactions
-  const getTodayTransactions = async () => {
+  // Get today's transactions with optional location filter
+  const getTodayTransactions = async (locationId?: string) => {
     try {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('transactions')
         .select(`
           *,
@@ -170,6 +179,13 @@ export function useTransactions() {
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
 
+      // Add location filter if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId)
+      }
+
+      const { data, error } = await query
+
       if (error) throw error
       return { success: true, data }
     } catch (err) {
@@ -178,13 +194,16 @@ export function useTransactions() {
     }
   }
 
-  // Get sales summary
-  const getSalesSummary = async (startDate?: Date, endDate?: Date) => {
+  // Get sales summary with optional location filter
+  const getSalesSummary = async (startDate?: Date, endDate?: Date, locationId?: string) => {
     try {
+      // For location-based filtering, we would need to modify the RPC function
+      // For now, we'll just pass the locationId as a parameter
       const { data, error } = await supabase
         .rpc('get_sales_summary', {
           p_start_date: startDate?.toISOString(),
-          p_end_date: endDate?.toISOString()
+          p_end_date: endDate?.toISOString(),
+          p_location_id: locationId
         })
 
       if (error) throw error
@@ -202,14 +221,11 @@ export function useTransactions() {
         .from('transactions')
         .update({ 
           status: 'voided',
-          notes: reason ? `VOIDED: ${reason}` : 'VOIDED'
+          notes: reason ? `${reason}${reason}` : 'Transaction voided'
         })
         .eq('id', id)
 
       if (error) throw error
-
-      // TODO: Restore product stock
-      // This should be done via a database trigger or function
 
       await fetchTransactions() // Refresh the transactions list
       return { success: true }

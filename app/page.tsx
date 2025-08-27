@@ -27,18 +27,39 @@ import {
   ImageIcon,
   Calculator,
   Camera,
+  Users,
+  TrendingUp,
+  MapPin,
+  Scan,
+  Truck,
+  Activity,
+  WifiOff,
+  Shield
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import AddProduct from "@/components/add-product"
+import CustomerManagement from "@/components/customer-management"
+import AnalyticsDashboard from "@/components/analytics-dashboard"
+import EnhancedAnalyticsDashboard from "@/components/enhanced-analytics-dashboard"
+import LocationManagement from "@/components/location-management"
+import BarcodeScanner from "@/components/barcode-scanner"
+import InventoryCount from "@/components/inventory-count"
+import SupplierManagement from "@/components/supplier-management"
+import PurchaseOrderManagement from "@/components/purchase-order"
+import OfflineTransactionProcessing from "@/components/offline-transaction-processing"
+import RBACManagement from "@/components/rbac-management"
+import ConsolidatedReporting from "@/components/consolidated-reporting"
 
 import { useProducts } from "@/lib/hooks/useProducts"
 import { useCategories } from "@/lib/hooks/useCategories"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useCustomers } from "@/lib/hooks/useCustomers"
+import AuthGuard, { useAuth } from "@/components/auth/AuthGuard"
+import UserProfile from "@/components/auth/UserProfile"
 
-function POSScreen({ onBack, products, categories, setCurrentScreen, createTransaction, updateStock, fetchProducts }: { onBack: () => void; products: any[]; categories: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; createTransaction: any; updateStock: any; fetchProducts: () => Promise<void> }) {
+function POSScreen({ onBack, products, categories, setCurrentScreen, createTransaction, updateStock, fetchProducts, profile }: { onBack: () => void; products: any[]; categories: any[]; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product" | "profile">>; createTransaction: any; updateStock: any; fetchProducts: () => Promise<void>; profile: any }) {
   const [cart, setCart] = useState<{ [key: string]: number }>({})
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
@@ -52,9 +73,12 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
   const [paymentOption, setPaymentOption] = useState<"pay-later" | "multi-payment">("pay-later")
   const [showCustomerDetails, setShowCustomerDetails] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [multiPayments, setMultiPayments] = useState<{method: string, amount: number}[]>([])
+  const [cashAmount, setCashAmount] = useState<number>(0)
+  const [changeAmount, setChangeAmount] = useState<number>(0)
 
   // Handle payment transaction processing
-  const handleTransaction = async (paymentMethod: 'cash' | 'credit') => {
+  const handleTransaction = async (paymentMethod: 'cash' | 'credit' | 'card' | 'gcash' | 'paymaya' | 'grab-pay' | 'multi' | 'multi-payment') => {
     if (totalItems === 0) {
       alert('Cart is empty. Please add items before processing payment.')
       return
@@ -69,16 +93,40 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
       console.log('Processing transaction:', { cartItems, paymentMethod })
       
       // Call the createTransaction hook with correct parameters
+      let finalPaymentMethod = paymentMethod
+      let transactionNotes = showCustomerDetails ? `Customer: ${customerDetails.name}` : undefined
+      
+      // Handle multi-payment logic
+      if (paymentMethod === 'multi' && multiPayments.length > 0) {
+        const totalPaid = multiPayments.reduce((sum, payment) => sum + payment.amount, 0)
+        if (Math.abs(totalPaid - totalAmount) > 0.01) {
+          alert(`Payment total (₱${totalPaid.toFixed(2)}) doesn't match order total (₱${totalAmount.toFixed(2)})`)
+          return
+        }
+        finalPaymentMethod = 'multi-payment'
+        transactionNotes = `${transactionNotes ? transactionNotes + ' | ' : ''}Multi-payment: ${multiPayments.map(p => `${p.method}: ₱${p.amount.toFixed(2)}`).join(', ')}`
+      }
+      
+      // Handle cash payment with change calculation
+      if (paymentMethod === 'cash' && cashAmount > 0) {
+        if (cashAmount < totalAmount) {
+          alert(`Insufficient cash amount. Required: ₱${totalAmount.toFixed(2)}, Received: ₱${cashAmount.toFixed(2)}`)
+          return
+        }
+        const change = cashAmount - totalAmount
+        setChangeAmount(change)
+        transactionNotes = `${transactionNotes ? transactionNotes + ' | ' : ''}Cash: ₱${cashAmount.toFixed(2)}, Change: ₱${change.toFixed(2)}`
+      }
       const transactionResult = await createTransaction(
         cartItems,
-        paymentMethod,
+        finalPaymentMethod,
         undefined, // customerId
         paymentMethod === 'credit', // isCredit
         0, // serviceFee
         0, // deliveryFee
         0, // discount
         0, // tax
-        showCustomerDetails ? `Customer: ${customerDetails.name}` : undefined // notes
+        transactionNotes // notes
       )
       
       if (transactionResult.success) {
@@ -101,8 +149,23 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
         setCustomerDetails({ name: '', number: '', address: '', notes: '' })
         setShowCustomerDetails(false)
         
-        // Show success message
-        alert(`Transaction completed successfully! ${paymentMethod === 'credit' ? 'Credit payment recorded.' : 'Cash payment processed.'}`)
+        // Reset payment states
+        setCashAmount(0)
+        setChangeAmount(0)
+        setMultiPayments([])
+        
+        // Show success message with payment details
+        let successMessage = `Transaction completed successfully!`
+        if (paymentMethod === 'cash' && changeAmount > 0) {
+          successMessage += ` Change due: ₱${changeAmount.toFixed(2)}`
+        } else if (paymentMethod === 'credit') {
+          successMessage += ` Credit payment recorded.`
+        } else if (paymentMethod === 'multi') {
+          successMessage += ` Multi-payment processed.`
+        } else {
+          successMessage += ` ${paymentMethod.toUpperCase()} payment processed.`
+        }
+        alert(successMessage)
         
         // Go to receipt view
         setPosScreen('receipt')
@@ -115,6 +178,29 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  // Handle adding payment method in multi-payment
+  const addPaymentMethod = (method: string, amount: number) => {
+    if (amount <= 0) {
+      alert('Please enter a valid amount')
+      return
+    }
+    
+    const currentTotal = multiPayments.reduce((sum, payment) => sum + payment.amount, 0)
+    const remaining = totalAmount - currentTotal
+    
+    if (amount > remaining) {
+      alert(`Amount exceeds remaining balance. Remaining: ₱${remaining.toFixed(2)}`)
+      return
+    }
+    
+    setMultiPayments(prev => [...prev, { method, amount }])
+  }
+  
+  // Remove payment method from multi-payment
+  const removePaymentMethod = (index: number) => {
+    setMultiPayments(prev => prev.filter((_, i) => i !== index))
   }
 
   const updateQuantity = (productId: string, change: number) => {
@@ -223,25 +309,172 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
           </div>
 
           {/* Payment Method Buttons */}
-          <div className="space-y-6">
-            <Button 
-              onClick={() => handleTransaction("cash")}
-              disabled={isProcessing}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
-            >
-              {isProcessing ? 'Processing...' : 'Cash'}
-            </Button>
-            <Button 
-              onClick={() => handleTransaction("credit")}
-              disabled={isProcessing}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-8 text-2xl font-bold rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
-            >
-              <div className="text-center">
-                <div className="text-2xl">{isProcessing ? 'Processing...' : 'Credit'}</div>
-                {!isProcessing && <div className="text-lg opacity-90 font-medium">UTANG</div>}
+          {paymentOption === "pay-later" ? (
+            <div className="space-y-4">
+              {/* Cash Payment with Amount Input */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    placeholder="Enter cash amount"
+                    value={cashAmount || ''}
+                    onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+                    className="flex-1 text-lg py-3"
+                  />
+                  <Button 
+                    onClick={() => handleTransaction("cash")}
+                    disabled={isProcessing || cashAmount < totalAmount}
+                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 px-6 text-lg font-bold rounded-xl"
+                  >
+                    💵 Cash
+                  </Button>
+                </div>
+                {cashAmount > 0 && cashAmount >= totalAmount && (
+                  <div className="text-center text-green-600 font-medium">
+                    Change: ₱{(cashAmount - totalAmount).toFixed(2)}
+                  </div>
+                )}
+                {cashAmount > 0 && cashAmount < totalAmount && (
+                  <div className="text-center text-red-600 font-medium">
+                    Insufficient amount
+                  </div>
+                )}
               </div>
-            </Button>
-          </div>
+              
+              {/* Digital Payment Methods Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <Button 
+                  onClick={() => handleTransaction("card")}
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-6 text-lg font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
+                >
+                  <div className="text-center">
+                    <div className="text-xl mb-1">💳</div>
+                    <div>Card</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  onClick={() => handleTransaction("gcash")}
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-6 text-lg font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
+                >
+                  <div className="text-center">
+                    <div className="text-xl mb-1">📱</div>
+                    <div>GCash</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  onClick={() => handleTransaction("paymaya")}
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-6 text-lg font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
+                >
+                  <div className="text-center">
+                    <div className="text-xl mb-1">💚</div>
+                    <div>PayMaya</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  onClick={() => handleTransaction("grab-pay")}
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-6 text-lg font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
+                >
+                  <div className="text-center">
+                    <div className="text-xl mb-1">🚗</div>
+                    <div>GrabPay</div>
+                  </div>
+                </Button>
+              </div>
+              
+              {/* Credit Payment */}
+              <Button 
+                onClick={() => handleTransaction("credit")}
+                disabled={isProcessing}
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-6 text-xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:transform-none"
+              >
+                <div className="text-center">
+                  <div className="text-xl">{isProcessing ? 'Processing...' : '📋 Credit'}</div>
+                  {!isProcessing && <div className="text-lg opacity-90 font-medium">UTANG</div>}
+                </div>
+              </Button>
+            </div>
+          ) : (
+            /* Multi-Payment Mode */
+            <div className="space-y-4">
+              {/* Current Payments List */}
+              {multiPayments.length > 0 && (
+                <div className="bg-white rounded-lg p-4 space-y-2">
+                  <h3 className="font-medium text-gray-800 mb-3">Selected Payments:</h3>
+                  {multiPayments.map((payment, index) => (
+                    <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <span className="capitalize font-medium">{payment.method}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">₱{payment.amount.toFixed(2)}</span>
+                        <Button
+                          onClick={() => removePaymentMethod(index)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 p-1"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 mt-3">
+                    <div className="flex justify-between items-center font-bold">
+                      <span>Total Paid:</span>
+                      <span>₱{multiPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                      <span>Remaining:</span>
+                      <span>₱{(totalAmount - multiPayments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Add Payment Methods */}
+              <div className="grid grid-cols-2 gap-3">
+                {['cash', 'card', 'gcash', 'paymaya'].map((method) => (
+                  <div key={method} className="space-y-2">
+                    <Input
+                      type="number"
+                      placeholder={`${method} amount`}
+                      id={`amount-${method}`}
+                      className="text-center"
+                    />
+                    <Button
+                      onClick={() => {
+                        const input = document.getElementById(`amount-${method}`) as HTMLInputElement
+                        const amount = parseFloat(input.value) || 0
+                        if (amount > 0) {
+                          addPaymentMethod(method, amount)
+                          input.value = ''
+                        }
+                      }}
+                      className="w-full py-2 text-sm capitalize bg-purple-500 hover:bg-purple-600 text-white rounded"
+                    >
+                      Add {method}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Complete Multi-Payment */}
+              {multiPayments.length > 0 && Math.abs(multiPayments.reduce((sum, p) => sum + p.amount, 0) - totalAmount) < 0.01 && (
+                <Button
+                  onClick={() => handleTransaction("multi")}
+                  disabled={isProcessing}
+                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white py-6 text-xl font-bold rounded-xl shadow-lg"
+                >
+                  Complete Multi-Payment
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -431,7 +664,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} />
+          <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} role="button" aria-label="Back" />
           <h1 className="text-xl font-semibold">POS</h1>
         </div>
         <div className="flex gap-2">
@@ -495,7 +728,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
                       <p className="text-[10px] text-gray-300">{product.stock} Pcs (Stocks)</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-semibold">₱ {product.price.toFixed(2)}</p>
+                      <p className="text-xs font-semibold">₱ {(product.price || 0).toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="w-12 bg-green-500 text-white rounded-r-lg flex flex-col items-center justify-center relative py-1">
@@ -594,7 +827,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
   )
 }
 
-function InventoryScreen({ products, categories, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleAddStock, handleDuplicateProduct }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; handleEditProduct: any; handleDeleteProduct: any; handleAddStock: any; handleDuplicateProduct: any }) {
+function InventoryScreen({ products, categories, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleAddStock, handleDuplicateProduct }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product" | "profile">>; handleEditProduct: any; handleDeleteProduct: any; handleAddStock: any; handleDuplicateProduct: any }) {
   const [activeTab, setActiveTab] = useState<"list" | "replenishment">("list")
   const [showStockAtCategory, setShowStockAtCategory] = useState(true)
   const [showStockInPOS, setShowStockInPOS] = useState(true)
@@ -780,7 +1013,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen, 
                                     Stock: <span className="font-medium text-gray-900">{product.stock}</span>
                                   </p>
                                   <p className="text-xs text-gray-600">
-                                    Price: <span className="font-medium text-green-600">₱{product.price}</span>
+                                    Price: <span className="font-medium text-green-600">₱{(product.price || 0).toFixed(2)}</span>
                                   </p>
                                 </div>
                                 {product.units && product.units.length > 1 && (
@@ -874,7 +1107,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen, 
   )
 }
 
-function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleDuplicateProduct, handleCreateProduct, handleBulkDeleteProducts, categories }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; handleEditProduct: any; handleDeleteProduct: any; handleDuplicateProduct: any; handleCreateProduct: any; handleBulkDeleteProducts: any; categories: any[] }) {
+function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleDuplicateProduct, handleCreateProduct, handleBulkDeleteProducts, categories }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product" | "profile">>; handleEditProduct: any; handleDeleteProduct: any; handleDuplicateProduct: any; handleCreateProduct: any; handleBulkDeleteProducts: any; categories: any[] }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [bulkEditMode, setBulkEditMode] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
@@ -1055,7 +1288,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handl
           {/* Header */}
           <div className="bg-white px-4 py-3 flex items-center justify-between border-b">
             <div className="flex items-center gap-4">
-              <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} />
+              <ArrowLeft className="w-6 h-6 cursor-pointer" onClick={onBack} role="button" aria-label="Back" />
               <h1 className="text-2xl font-bold text-gray-800">PRODUCTS</h1>
             </div>
             <div className="flex items-center gap-3">
@@ -1074,10 +1307,55 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handl
                   <div className="w-3 h-1 bg-gray-400"></div>
                   <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
                   <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+      <div className="bg-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} aria-label="Back" title="Back">
+            <ArrowLeft className="w-6 h-6 cursor-pointer" />
+          </button>
+          <h1 className="text-xl font-semibold">POS</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="bg-gray-100 p-2 rounded">
+              <Search className="w-5 h-5 text-gray-500" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search products"
+              className="border-none outline-none"
+            />
+          </div>
+          <div className="bg-purple-600 p-2 rounded">
+            <BarChart3 className="w-5 h-5 text-white" />
+          </div>
+        </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <span className="text-lg">₱</span>
+                <div className="flex flex-col">
+                  <div className="w-3 h-1 bg-gray-400"></div>
+                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
                 </div>
               </div>
               <div className="bg-purple-600 p-2 rounded">
                 <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <span className="text-lg">₱</span>
+                <div className="flex flex-col">
+                  <div className="w-3 h-1 bg-gray-400"></div>
+                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+                  <div className="w-3 h-1 bg-gray-400 mt-0.5"></div>
+                </div>
+              </div>
+              <div className="bg-purple-600 p-2 rounded">
+                <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+            </div>
               </div>
             </div>
           </div>
@@ -1231,7 +1509,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handl
                       ) : (
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-800">{product.name}</h3>
-                          <p className="text-lg font-bold text-gray-900">₱{product.price.toFixed(2)}</p>
+                          <p className="text-lg font-bold text-gray-900">₱{(product.price || 0).toFixed(2)}</p>
                           <p className="text-xs text-gray-500">Stock: {product.stock}</p>
                         </div>
                       )}
@@ -1314,16 +1592,27 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handl
   )
 }
 
-export default function Dashboard() {
-  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "add-product">(
-    "dashboard"
-  )
+function Dashboard() {
+  const [currentScreen, setCurrentScreen] = useState<
+    "dashboard" | "pos" | "inventory" | "products" | "add-product" | "profile" | "customers" | "analytics" | "enhanced-analytics" | "locations" | "barcode" | "inventory-count" | "suppliers" | "purchase-orders" | "offline-transactions" | "rbac" | "consolidated-reporting"
+  >("dashboard")
+  
+  const { profile } = useAuth()
   
   // Use Supabase hooks for real data
   const { products: dbProducts, loading: productsLoading, createProduct, updateProduct, deleteProduct, updateStock, fetchProducts } = useProducts()
   const { categories, loading: categoriesLoading, createCategory } = useCategories()
   const { createTransaction } = useTransactions()
   const { customers, createCustomer } = useCustomers()
+  
+  // Fetch products with location filter
+  useEffect(() => {
+    if (profile?.location_id) {
+      fetchProducts(profile.location_id)
+    } else {
+      fetchProducts()
+    }
+  }, [profile?.location_id])
   
   // Transform database products to match the component structure
   const products = dbProducts.map(product => ({
@@ -1497,7 +1786,7 @@ export default function Dashboard() {
 
   
       if (currentScreen === "pos") {
-        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={handleAddStock} fetchProducts={fetchProducts} />
+        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={handleAddStock} fetchProducts={() => fetchProducts(profile?.location_id)} profile={profile} />
       }
 
       if (currentScreen === "inventory") {
@@ -1512,176 +1801,182 @@ export default function Dashboard() {
         return <AddProduct onBack={() => setCurrentScreen("dashboard")} onSave={handleSaveNewProduct} />
       }
 
+      if (currentScreen === "profile") {
+        return <UserProfile onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "customers") {
+        return <CustomerManagement onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "locations") {
+        return <LocationManagement onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "analytics") {
+        return <AnalyticsDashboard onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "enhanced-analytics") {
+        return <EnhancedAnalyticsDashboard onBack={() => setCurrentScreen("analytics")} />
+      }
+
+      if (currentScreen === "barcode") {
+        return <BarcodeScanner onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "inventory-count") {
+        return <InventoryCount onBack={() => setCurrentScreen("inventory")} />
+      }
+
+      if (currentScreen === "suppliers") {
+        return <SupplierManagement onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "purchase-orders") {
+        return <PurchaseOrderManagement onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "offline-transactions") {
+        return <OfflineTransactions onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "rbac") {
+        return <RBACManagement onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      if (currentScreen === "consolidated-reporting") {
+        return <ConsolidatedReporting onBack={() => setCurrentScreen("dashboard")} />
+      }
+
+      // Default to dashboard
       return (
-        <div className="min-h-screen bg-gray-100 max-w-sm mx-auto relative">
+        <div className="min-h-screen bg-gray-100 max-w-sm mx-auto">
           {/* Header */}
-          <div className="bg-white px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">P</span>
-                </div>
-                <span className="text-2xl font-bold text-purple-600">Peddlr</span>
-                <div className="w-6 h-4 bg-gradient-to-b from-blue-500 via-white to-red-500 rounded-sm ml-1"></div>
-              </div>
-              <Button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Account
-              </Button>
-            </div>
-          </div>
-
-      {/* Balance Card */}
-      <div className="px-4 mb-6">
-        <div className="bg-purple-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between mb-4">
+          <div className="bg-white px-4 py-3 flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-800">Peddlr</h1>
             <div className="flex items-center gap-3">
-              <div className="text-3xl">🍌</div>
-              <span className="text-lg font-medium">kankolek</span>
+              <Bell className="w-5 h-5 text-gray-600" />
+              <Settings className="w-5 h-5 text-gray-600" />
+              <UserCircle className="w-6 h-6 text-gray-600 cursor-pointer" onClick={() => setCurrentScreen("profile")} />
             </div>
-            <div className="text-right">
-              <div className="flex items-center gap-2 mb-1">
-                <Eye className="w-4 h-4" />
-                <span className="text-sm">Your Balance</span>
+          </div>
+
+          {/* Balance Card */}
+          <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg p-6 mx-4 mt-4 text-white">
+            <p className="text-sm opacity-80">Your Balance</p>
+            <p className="text-3xl font-bold mt-2">P 0.00</p>
+            <div className="flex gap-4 mt-4">
+              <button className="bg-white bg-opacity-20 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                <ArrowUpCircle className="w-4 h-4" />
+                Send
+              </button>
+              <button className="bg-white bg-opacity-20 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                <ArrowDownCircle className="w-4 h-4" />
+                Receive
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-2 gap-4 mx-4 mt-6">
+            <button 
+              className="bg-white rounded-lg p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => setCurrentScreen("pos")}
+            >
+              <ShoppingBag className="w-8 h-8 text-pink-500 mb-2" />
+              <span className="font-medium text-gray-800">POS</span>
+            </button>
+            <button 
+              className="bg-white rounded-lg p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => setCurrentScreen("products")}
+            >
+              <Package className="w-8 h-8 text-purple-500 mb-2" />
+              <span className="font-medium text-gray-800">Products</span>
+            </button>
+            <button 
+              className="bg-white rounded-lg p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => setCurrentScreen("inventory")}
+            >
+              <BarChart3 className="w-8 h-8 text-blue-500 mb-2" />
+              <span className="font-medium text-gray-800">Inventory</span>
+            </button>
+            <button 
+              className="bg-white rounded-lg p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => setCurrentScreen("customers")}
+            >
+              <Users className="w-8 h-8 text-green-500 mb-2" />
+              <span className="font-medium text-gray-800">Customers</span>
+            </button>
+          </div>
+
+          {/* Recent Transactions */}
+          <div className="bg-white rounded-lg mx-4 mt-6 p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-semibold text-gray-800">Recent Transactions</h2>
+              <button className="text-pink-500 text-sm font-medium">See All</button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5 text-pink-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">Sale #12345</p>
+                    <p className="text-xs text-gray-500">Today, 10:30 AM</p>
+                  </div>
+                </div>
+                <p className="font-medium text-green-500">+P 1,250.00</p>
               </div>
-              <div className="text-2xl font-bold">P 0.00</div>
-              <div className="text-xs opacity-75">Powered by Netbank</div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Package className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">Restock #67890</p>
+                    <p className="text-xs text-gray-500">Yesterday, 2:15 PM</p>
+                  </div>
+                </div>
+                <p className="font-medium text-red-500">-P 850.00</p>
+              </div>
             </div>
           </div>
-          <Button className="w-full bg-white text-purple-600 hover:bg-gray-100 rounded-lg py-3 font-semibold">
-            Activate 🇵🇭QRPh
-          </Button>
-        </div>
-      </div>
 
-      {/* Services Grid */}
-      <div className="px-4 mb-6">
-        <div className="grid grid-cols-4 gap-4">
-          {/* Row 1 */}
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <DollarSign className="w-6 h-6 text-purple-600" />
+          {/* Bottom Navigation */}
+          <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
+            <div className="flex justify-around items-center py-3 relative">
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("dashboard")}>
+                <Home className="w-6 h-6 text-purple-600 mx-auto mb-1" />
+                <p className="text-xs text-purple-600 font-medium">Home</p>
+              </div>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
+                <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Inventory</p>
+              </div>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("pos")}>
+                <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Store</p>
+              </div>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
+                <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Products</p>
+              </div>
+              <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("analytics")}>
+                <BarChart3 className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-xs text-gray-400">Analytics</p>
+              </div>
             </div>
-            <p className="text-xs font-medium text-gray-700">Cash</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <CreditCard className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Credit</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Monitor className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Payment</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Receipt className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Expenses</p>
-          </div>
-
-          {/* Row 2 */}
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("pos")}>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Monitor className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">POS</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <ShoppingCart className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Receipts</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <ShoppingBag className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Purchases</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <BarChart3 className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Reports</p>
-          </div>
-
-          {/* Row 3 */}
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Link className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Store Link</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Gamepad2 className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Play & Win</p>
-          </div>
-
-          <div className="text-center relative">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <Mail className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-              12
-            </div>
-            <p className="text-xs font-medium text-gray-700">Inbox</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 mx-auto">
-              <FileText className="w-6 h-6 text-purple-600" />
-            </div>
-            <p className="text-xs font-medium text-gray-700">Products</p>
           </div>
         </div>
-      </div>
+      )
+}
 
-
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
-        <div className="flex justify-around items-center py-3 relative">
-          <div className="text-center">
-            <Home className="w-6 h-6 text-purple-600 mx-auto mb-1" />
-            <p className="text-xs text-purple-600 font-medium">Home</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("inventory")}>
-            <Package className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Inventory</p>
-          </div>
-
-          {/* Add Product Button - Center */}
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("add-product")}>
-            <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-1 mx-auto shadow-lg transform hover:scale-105 transition-all">
-              <Plus className="w-6 h-6 text-white" />
-            </div>
-            <p className="text-xs text-purple-600 font-medium">Add Product</p>
-          </div>
-
-          <div className="text-center cursor-pointer hover:opacity-80" onClick={() => setCurrentScreen("products")}>
-            <FileText className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Products</p>
-          </div>
-
-          <div className="text-center">
-            <ShoppingBag className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-            <p className="text-xs text-gray-400">Store</p>
-          </div>
-        </div>
-      </div>
-    </div>
+export default function Home() {
+  return (
+    <AuthProvider>
+      <Dashboard />
+    </AuthProvider>
   )
 }

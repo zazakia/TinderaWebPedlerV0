@@ -12,17 +12,24 @@ export function useCustomers() {
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Fetch all customers
-  const fetchCustomers = async () => {
+  // Fetch all customers with optional location filter
+  const fetchCustomers = async (locationId?: string) => {
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
         .eq('is_active', true)
         .order('name')
+      
+      // Add location filter if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setCustomers(data || [])
@@ -34,7 +41,7 @@ export function useCustomers() {
     }
   }
 
-  // Create a new customer
+  // Create a new customer with location support
   const createCustomer = async (customer: CustomerInsert) => {
     try {
       const { data, error } = await supabase
@@ -89,15 +96,22 @@ export function useCustomers() {
     }
   }
 
-  // Get customers with outstanding balance
-  const getCustomersWithBalance = async () => {
+  // Get customers with outstanding balance with optional location filter
+  const getCustomersWithBalance = async (locationId?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
         .gt('current_balance', 0)
         .eq('is_active', true)
         .order('current_balance', { ascending: false })
+
+      // Add location filter if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       return { success: true, data }

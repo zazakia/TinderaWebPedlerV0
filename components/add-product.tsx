@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/lib/hooks/useCategories'
+import { useAuth } from '@/components/auth/AuthGuard'
 
 interface Unit {
   id: string
@@ -37,6 +38,7 @@ interface ProductData {
   is_active: boolean
   is_online_store: boolean
   image_url?: string
+  location_id?: string
   units: Unit[]
 }
 
@@ -46,6 +48,7 @@ interface AddProductProps {
 }
 
 export default function AddProduct({ onBack, onSave }: AddProductProps) {
+  const { profile } = useAuth()
   const [selectedColor, setSelectedColor] = useState('#1e40af')
   const [baseUnit, setBaseUnit] = useState('Piece')
   const [units, setUnits] = useState<Unit[]>([])
@@ -63,6 +66,7 @@ export default function AddProduct({ onBack, onSave }: AddProductProps) {
     has_addons: false,
     is_active: true,
     is_online_store: false,
+    location_id: profile?.location_id,
     units: []
   })
 
@@ -206,6 +210,11 @@ export default function AddProduct({ onBack, onSave }: AddProductProps) {
       // Generate SKU if not provided
       if (!finalProductData.sku) {
         finalProductData.sku = generateSKU()
+      }
+
+      // Ensure location_id is set from user profile
+      if (profile?.location_id) {
+        finalProductData.location_id = profile.location_id
       }
 
       // Prepare the product data with units

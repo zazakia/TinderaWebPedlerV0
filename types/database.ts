@@ -79,6 +79,7 @@ export type Database = {
           is_active: boolean
           is_online_store: boolean
           image_url: string | null
+          location_id: string | null
           created_at: string
           updated_at: string
         }
@@ -105,6 +106,7 @@ export type Database = {
           is_active?: boolean
           is_online_store?: boolean
           image_url?: string | null
+          location_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -131,6 +133,7 @@ export type Database = {
           is_active?: boolean
           is_online_store?: boolean
           image_url?: string | null
+          location_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -186,6 +189,7 @@ export type Database = {
           total_purchases: number
           last_purchase_date: string | null
           is_active: boolean
+          location_id: string | null
           created_at: string
           updated_at: string
         }
@@ -201,6 +205,7 @@ export type Database = {
           total_purchases?: number
           last_purchase_date?: string | null
           is_active?: boolean
+          location_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -216,6 +221,7 @@ export type Database = {
           total_purchases?: number
           last_purchase_date?: string | null
           is_active?: boolean
+          location_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -238,6 +244,7 @@ export type Database = {
           is_credit: boolean
           credit_paid_amount: number
           credit_paid_date: string | null
+          location_id: string | null
           created_at: string
         }
         Insert: {
@@ -257,6 +264,7 @@ export type Database = {
           is_credit?: boolean
           credit_paid_amount?: number
           credit_paid_date?: string | null
+          location_id?: string | null
           created_at?: string
         }
         Update: {
@@ -276,6 +284,7 @@ export type Database = {
           is_credit?: boolean
           credit_paid_amount?: number
           credit_paid_date?: string | null
+          location_id?: string | null
           created_at?: string
         }
       }
@@ -477,9 +486,252 @@ export type Database = {
           updated_at?: string
         }
       }
+      suppliers: {
+        Row: {
+          id: string
+          name: string
+          contact_info: Json | null
+          terms: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          contact_info?: Json | null
+          terms?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          contact_info?: Json | null
+          terms?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      purchase_orders: {
+        Row: {
+          id: string
+          supplier_id: string
+          status: string
+          total: number
+          created_by: string | null
+          notes: string | null
+          expected_delivery: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          supplier_id: string
+          status?: string
+          total?: number
+          created_by?: string | null
+          notes?: string | null
+          expected_delivery?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          supplier_id?: string
+          status?: string
+          total?: number
+          created_by?: string | null
+          notes?: string | null
+          expected_delivery?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      purchase_order_items: {
+        Row: {
+          id: string
+          purchase_order_id: string
+          product_id: string | null
+          quantity: number
+          unit_price: number
+          total_price: number
+          received_quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          purchase_order_id: string
+          product_id?: string | null
+          quantity: number
+          unit_price: number
+          total_price?: number
+          received_quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          purchase_order_id?: string
+          product_id?: string | null
+          quantity?: number
+          unit_price?: number
+          total_price?: number
+          received_quantity?: number
+          created_at?: string
+        }
+      }
+      user_permissions: {
+        Row: {
+          id: string
+          user_id: string
+          permission_name: string
+          resource: string | null
+          granted_by: string | null
+          granted_at: string
+          expires_at: string | null
+          is_active: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          permission_name: string
+          resource?: string | null
+          granted_by?: string | null
+          granted_at?: string
+          expires_at?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          permission_name?: string
+          resource?: string | null
+          granted_by?: string | null
+          granted_at?: string
+          expires_at?: string | null
+          is_active?: boolean
+        }
+      }
+      user_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          session_token: string
+          device_info: string | null
+          ip_address: string | null
+          location: string | null
+          is_active: boolean
+          last_activity: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_token: string
+          device_info?: string | null
+          ip_address?: string | null
+          location?: string | null
+          is_active?: boolean
+          last_activity?: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_token?: string
+          device_info?: string | null
+          ip_address?: string | null
+          location?: string | null
+          is_active?: boolean
+          last_activity?: string
+          expires_at?: string
+          created_at?: string
+        }
+      }
+      activity_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          action: string
+          resource_type: string | null
+          resource_id: string | null
+          details: Json | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          action: string
+          resource_type?: string | null
+          resource_id?: string | null
+          details?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          action?: string
+          resource_type?: string | null
+          resource_id?: string | null
+          details?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+      }
+      permission_templates: {
+        Row: {
+          id: string
+          role: string
+          permissions: Json
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          role: string
+          permissions?: Json
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          role?: string
+          permissions?: Json
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
-      [_ in never]: never
+      user_profiles_with_location: {
+        Row: {
+          id: string | null
+          email: string | null
+          full_name: string | null
+          role: string | null
+          location_id: string | null
+          phone: string | null
+          avatar_url: string | null
+          is_active: boolean | null
+          last_login_at: string | null
+          created_at: string | null
+          updated_at: string | null
+          location_name: string | null
+          location_address: string | null
+        }
+      } | null
     }
     Functions: {
       generate_receipt_number: {

@@ -16,7 +16,7 @@ const customJestConfig = {
     '^@/hooks/(.*)$': '<rootDir>/lib/hooks/$1',
     '^@/types/(.*)$': '<rootDir>/types/$1',
   },
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
     'components/**/*.{js,jsx,ts,tsx}',

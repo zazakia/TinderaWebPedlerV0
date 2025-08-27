@@ -1,7 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Dashboard from '@/app/page'
-import { mockProducts, mockCategories, mockSupabaseClient } from '../../mocks/supabase'
+import { mockProducts, mockCategories, mockSupabaseClient } from '../mocks/supabase'
+import { AuthProvider } from '@/components/auth/AuthGuard'
 
 // Mock all hooks with realistic data
 const mockUseProducts = {
@@ -21,6 +22,7 @@ const mockUseProducts = {
   updateProduct: jest.fn().mockResolvedValue({ success: true }),
   deleteProduct: jest.fn().mockResolvedValue({ success: true }),
   updateStock: jest.fn().mockResolvedValue({ success: true }),
+  fetchProducts: jest.fn(), // Add the missing fetchProducts function
 }
 
 const mockUseCategories = {
@@ -33,19 +35,47 @@ const mockUseTransactions = {
   createTransaction: jest.fn().mockResolvedValue({ success: true }),
 }
 
-jest.mock('@/lib/hooks/useProducts', () => ({
+// Mock auth context
+const mockAuthContext = {
+  user: { id: 'test-user-id', email: 'test@example.com' },
+  profile: { 
+    id: 'test-user-id', 
+    email: 'test@example.com', 
+    full_name: 'Test User', 
+    role: 'admin',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  },
+  session: { access_token: 'test-token' },
+  loading: false,
+  error: null,
+  signIn: jest.fn(),
+  signUp: jest.fn(),
+  signOut: jest.fn(),
+  resetPassword: jest.fn(),
+  updateProfile: jest.fn(),
+  refreshSession: jest.fn(),
+}
+
+jest.mock('../../lib/hooks/useAuth', () => ({
+  useAuth: () => mockAuthContext,
+  useAuthContext: () => mockAuthContext,
+}))
+
+jest.mock('../../lib/hooks/useProducts', () => ({
   useProducts: () => mockUseProducts,
 }))
 
-jest.mock('@/lib/hooks/useCategories', () => ({
+jest.mock('../../lib/hooks/useCategories', () => ({
   useCategories: () => mockUseCategories,
 }))
 
-jest.mock('@/lib/hooks/useTransactions', () => ({
+jest.mock('../../lib/hooks/useTransactions', () => ({
   useTransactions: () => mockUseTransactions,
 }))
 
-jest.mock('@/lib/hooks/useCustomers', () => ({
+jest.mock('../../lib/hooks/useCustomers', () => ({
   useCustomers: () => ({
     customers: [],
     createCustomer: jest.fn().mockResolvedValue({ success: true }),
@@ -75,6 +105,15 @@ jest.mock('@/components/add-product', () => {
   }
 })
 
+// Custom render function that wraps components with AuthProvider
+const renderWithAuth = (component: React.ReactElement) => {
+  return render(
+    <AuthProvider>
+      {component}
+    </AuthProvider>
+  )
+}
+
 describe('Regression Tests - Critical Functionality', () => {
   let user: ReturnType<typeof userEvent.setup>
 
@@ -86,14 +125,14 @@ describe('Regression Tests - Critical Functionality', () => {
   describe('Core Application Stability', () => {
     it('REGRESSION: Application should render without crashing', () => {
       expect(() => {
-        render(<Dashboard />)
+        renderWithAuth(<Dashboard />)
       }).not.toThrow()
 
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
     })
 
     it('REGRESSION: Should maintain state consistency across screen navigation', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       // Navigate through all screens to ensure state consistency
       const screens = [
@@ -122,7 +161,7 @@ describe('Regression Tests - Critical Functionality', () => {
     })
 
     it('REGRESSION: Should handle rapid user interactions without breaking', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       // Simulate rapid clicking
       for (let i = 0; i < 10; i++) {
@@ -142,7 +181,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('POS System Critical Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       const posButton = screen.getByText('POS')
       await user.click(posButton)
       await waitFor(() => {
@@ -224,7 +263,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Product Management Critical Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
       await waitFor(() => {
@@ -269,7 +308,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Inventory Management Critical Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       // Navigate to inventory through products screen
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
@@ -316,7 +355,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Add Product Critical Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
       await waitFor(() => {
@@ -360,7 +399,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Data Integrity and Persistence', () => {
     it('REGRESSION: Product data must remain consistent across operations', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       // Navigate to POS and verify product data
       const posButton = screen.getByText('POS')
@@ -389,7 +428,7 @@ describe('Regression Tests - Critical Functionality', () => {
     })
 
     it('REGRESSION: Category data must remain consistent', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       // Check categories in POS
       const posButton = screen.getByText('POS')
@@ -417,7 +456,7 @@ describe('Regression Tests - Critical Functionality', () => {
   describe('Error Recovery and Resilience', () => {
     it('REGRESSION: Application must recover from hook errors', () => {
       // Mock error in useProducts
-      jest.doMock('@/lib/hooks/useProducts', () => ({
+      jest.doMock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -426,11 +465,12 @@ describe('Regression Tests - Critical Functionality', () => {
           updateProduct: jest.fn(),
           deleteProduct: jest.fn(),
           updateStock: jest.fn(),
+          fetchProducts: jest.fn(),
         }),
       }))
 
       expect(() => {
-        render(<Dashboard />)
+        renderWithAuth(<Dashboard />)
       }).not.toThrow()
 
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
@@ -438,7 +478,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
     it('REGRESSION: Application must handle missing data gracefully', () => {
       // Mock empty data
-      jest.doMock('@/lib/hooks/useProducts', () => ({
+      jest.doMock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -446,10 +486,11 @@ describe('Regression Tests - Critical Functionality', () => {
           updateProduct: jest.fn(),
           deleteProduct: jest.fn(),
           updateStock: jest.fn(),
+          fetchProducts: jest.fn(),
         }),
       }))
 
-      jest.doMock('@/lib/hooks/useCategories', () => ({
+      jest.doMock('../../lib/hooks/useCategories', () => ({
         useCategories: () => ({
           categories: [],
           loading: false,
@@ -457,7 +498,7 @@ describe('Regression Tests - Critical Functionality', () => {
         }),
       }))
 
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       // Should render without errors
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
@@ -466,7 +507,7 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Performance and Memory Regression', () => {
     it('REGRESSION: Application must not have memory leaks', async () => {
-      const { unmount } = render(<Dashboard />)
+      const { unmount } = renderWithAuth(<Dashboard />)
 
       // Navigate through screens
       const posButton = screen.getByText('POS')
@@ -484,7 +525,7 @@ describe('Regression Tests - Critical Functionality', () => {
     })
 
     it('REGRESSION: Rapid navigation must not degrade performance', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
 
       const startTime = performance.now()
 

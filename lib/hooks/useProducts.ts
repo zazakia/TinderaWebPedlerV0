@@ -20,13 +20,13 @@ export function useProducts() {
   const supabase = createClient()
 
   // Fetch all products with their units and groups
-  const fetchProducts = async () => {
+  const fetchProducts = async (locationId?: string) => {
     try {
       setLoading(true)
       setError(null)
 
       // Fetch products with their product groups
-      const { data: productsData, error: productsError } = await supabase
+      let query = supabase
         .from('products')
         .select(`
           *,
@@ -34,6 +34,13 @@ export function useProducts() {
         `)
         .eq('is_active', true)
         .order('name')
+      
+      // Add location filter if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId)
+      }
+      
+      const { data: productsData, error: productsError } = await query
 
       if (productsError) throw productsError
 

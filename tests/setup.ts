@@ -1,5 +1,5 @@
 // Basic test setup without external dependencies
-// import '@testing-library/jest-dom' // Commented out until installed
+import '@testing-library/jest-dom'
 import { TextEncoder, TextDecoder } from 'util'
 
 // Mock Next.js router

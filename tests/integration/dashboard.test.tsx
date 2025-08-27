@@ -1,10 +1,11 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Dashboard from '@/app/page'
-import { mockProducts, mockCategories, mockSupabaseClient } from '../../mocks/supabase'
+import { mockProducts, mockCategories, mockSupabaseClient } from '../mocks/supabase'
+import { AuthProvider } from '@/components/auth/AuthGuard'
 
 // Mock all the hooks
-jest.mock('@/lib/hooks/useProducts', () => ({
+jest.mock('../../lib/hooks/useProducts', () => ({
   useProducts: () => ({
     products: mockProducts.map(p => ({
       id: p.id,
@@ -18,6 +19,7 @@ jest.mock('@/lib/hooks/useProducts', () => ({
       units: []
     })),
     loading: false,
+    fetchProducts: jest.fn(), // Add the missing fetchProducts function
     createProduct: jest.fn().mockResolvedValue({ success: true }),
     updateProduct: jest.fn().mockResolvedValue({ success: true }),
     deleteProduct: jest.fn().mockResolvedValue({ success: true }),
@@ -25,7 +27,7 @@ jest.mock('@/lib/hooks/useProducts', () => ({
   }),
 }))
 
-jest.mock('@/lib/hooks/useCategories', () => ({
+jest.mock('../../lib/hooks/useCategories', () => ({
   useCategories: () => ({
     categories: mockCategories,
     loading: false,
@@ -33,17 +35,45 @@ jest.mock('@/lib/hooks/useCategories', () => ({
   }),
 }))
 
-jest.mock('@/lib/hooks/useTransactions', () => ({
+jest.mock('../../lib/hooks/useTransactions', () => ({
   useTransactions: () => ({
     createTransaction: jest.fn().mockResolvedValue({ success: true }),
   }),
 }))
 
-jest.mock('@/lib/hooks/useCustomers', () => ({
+jest.mock('../../lib/hooks/useCustomers', () => ({
   useCustomers: () => ({
     customers: [],
     createCustomer: jest.fn().mockResolvedValue({ success: true }),
   }),
+}))
+
+// Mock auth context
+const mockAuthContext = {
+  user: { id: 'test-user-id', email: 'test@example.com' },
+  profile: { 
+    id: 'test-user-id', 
+    email: 'test@example.com', 
+    full_name: 'Test User', 
+    role: 'admin',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  },
+  session: { access_token: 'test-token' },
+  loading: false,
+  error: null,
+  signIn: jest.fn(),
+  signUp: jest.fn(),
+  signOut: jest.fn(),
+  resetPassword: jest.fn(),
+  updateProfile: jest.fn(),
+  refreshSession: jest.fn(),
+}
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => mockAuthContext,
+  useAuthContext: () => mockAuthContext,
 }))
 
 // Mock the AddProduct component
@@ -60,6 +90,15 @@ jest.mock('@/components/add-product', () => {
   }
 })
 
+// Custom render function that wraps components with AuthProvider
+const renderWithAuth = (component: React.ReactElement) => {
+  return render(
+    <AuthProvider>
+      {component}
+    </AuthProvider>
+  )
+}
+
 describe('Dashboard Component - Integration Tests', () => {
   let user: ReturnType<typeof userEvent.setup>
 
@@ -70,7 +109,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Dashboard Screen Navigation', () => {
     it('should render dashboard screen by default', () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
       expect(screen.getByText('Your Balance')).toBeInTheDocument()
@@ -78,7 +117,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should navigate to POS screen when POS button is clicked', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       const posButton = screen.getByText('POS')
       await user.click(posButton)
@@ -90,7 +129,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should navigate to Products screen when Products button is clicked', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
@@ -102,7 +141,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should navigate to Inventory screen when clicking inventory nav', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // First navigate to products screen, then click inventory in bottom nav
       const productsButton = screen.getByText('Products')
@@ -122,7 +161,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should navigate to Add Product screen', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
@@ -142,7 +181,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('POS Screen Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       const posButton = screen.getByText('POS')
       await user.click(posButton)
       await waitFor(() => {
@@ -196,7 +235,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Products Screen Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
       await waitFor(() => {
@@ -245,7 +284,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Inventory Screen Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       // Navigate to products first, then inventory
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
@@ -290,7 +329,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Add Product Screen Functionality', () => {
     beforeEach(async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       // Navigate to add product screen
       const productsButton = screen.getByText('Products')
       await user.click(productsButton)
@@ -333,7 +372,7 @@ describe('Dashboard Component - Integration Tests', () => {
   describe('Error Handling and Edge Cases', () => {
     it('should handle empty product list', () => {
       // Mock empty products
-      jest.doMock('@/lib/hooks/useProducts', () => ({
+      jest.doMock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: false,
@@ -341,10 +380,11 @@ describe('Dashboard Component - Integration Tests', () => {
           updateProduct: jest.fn(),
           deleteProduct: jest.fn(),
           updateStock: jest.fn(),
+          fetchProducts: jest.fn(), // Add the missing fetchProducts function
         }),
       }))
 
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Should render without errors even with no products
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
@@ -352,7 +392,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
     it('should handle loading states', () => {
       // Mock loading state
-      jest.doMock('@/lib/hooks/useProducts', () => ({
+      jest.doMock('../../lib/hooks/useProducts', () => ({
         useProducts: () => ({
           products: [],
           loading: true,
@@ -360,17 +400,18 @@ describe('Dashboard Component - Integration Tests', () => {
           updateProduct: jest.fn(),
           deleteProduct: jest.fn(),
           updateStock: jest.fn(),
+          fetchProducts: jest.fn(), // Add the missing fetchProducts function
         }),
       }))
 
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Should render dashboard even during loading
       expect(screen.getByText('Peddlr')).toBeInTheDocument()
     })
 
     it('should handle rapid navigation between screens', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Rapid navigation
       const posButton = screen.getByText('POS')
@@ -394,7 +435,7 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Responsive Design and Accessibility', () => {
     it('should be accessible with proper ARIA labels', () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Check for accessible buttons
       const buttons = screen.getAllByRole('button')
@@ -405,7 +446,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should handle keyboard navigation', async () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Test tab navigation
       await user.tab()
@@ -417,7 +458,7 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should display properly in mobile viewport', () => {
-      render(<Dashboard />)
+      renderWithAuth(<Dashboard />)
       
       // Check for mobile-specific classes
       const mainContainer = screen.getByText('Peddlr').closest('div')
