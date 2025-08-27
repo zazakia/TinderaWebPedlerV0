@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useCategories } from '@/lib/hooks/useCategories'
-import { mockCategories, mockSupabaseClient } from '../mocks/supabase'
+import { mockCategories, mockSupabaseClient } from '../../mocks/supabase'
 
 // Mock the Supabase module
 jest.mock('@/lib/supabase', () => ({

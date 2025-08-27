@@ -77,6 +77,7 @@ const createMockQueryBuilder = (mockData: any[]) => {
     update: jest.fn().mockReturnThis(),
     delete: jest.fn().mockReturnThis(),
     upsert: jest.fn().mockReturnThis(),
+    rpc: jest.fn().mockReturnThis(),
     eq: jest.fn((column: string, value: any) => {
       filteredData = filteredData.filter(item => item[column] === value)
       return queryBuilder
@@ -207,7 +208,7 @@ export const mockSupabaseClient = {
   })),
 
   removeChannel: jest.fn(),
-  removeAllChannels: jest.fn(),
+  removeAllChannels: jest.fn().mockReturnValue(Promise.resolve({ error: null })),
 }
 
 // Mock the createClient function

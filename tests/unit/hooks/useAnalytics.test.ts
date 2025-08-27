@@ -56,15 +56,13 @@ describe('useAnalytics', () => {
       { date: '2023-01-02', revenue: 1500, transactions: 8, items_sold: 15 }
     ]
     
-    // Mock the query execution
+    // Mock the query execution to match the actual implementation
     mockSupabase.from.mockImplementation(() => ({
       select: () => ({
         gte: () => ({
           lte: () => ({
             group: () => ({
-              order: () => ({
-                eq: () => Promise.resolve({ data: mockData, error: null })
-              })
+              order: () => Promise.resolve({ data: mockData, error: null })
             })
           })
         })
@@ -87,7 +85,15 @@ describe('useAnalytics', () => {
     
     // Mock the query execution with error
     mockSupabase.from.mockImplementation(() => ({
-      select: () => Promise.resolve({ data: null, error: mockError })
+      select: () => ({
+        gte: () => ({
+          lte: () => ({
+            group: () => ({
+              order: () => Promise.resolve({ data: null, error: mockError })
+            })
+          })
+        })
+      })
     }))
     
     const { result } = renderHook(() => useAnalytics())
@@ -104,9 +110,17 @@ describe('useAnalytics', () => {
   it('should fetch all analytics data', wrapTest(async () => {
     const { result } = renderHook(() => useAnalytics())
     
-    // Mock the Supabase responses
+    // Mock the Supabase responses to return empty arrays without errors
     mockSupabase.from.mockImplementation(() => ({
-      select: () => Promise.resolve({ data: [], error: null })
+      select: () => ({
+        gte: () => ({
+          lte: () => ({
+            group: () => ({
+              order: () => Promise.resolve({ data: [], error: null })
+            })
+          })
+        })
+      })
     }))
     
     await act(async () => {

@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useProducts } from '@/lib/hooks/useProducts'
-import { mockProducts, mockSupabaseClient } from '../mocks/supabase'
+import { mockProducts, mockSupabaseClient } from '../../mocks/supabase'
 
 // Mock the Supabase module
 jest.mock('@/lib/supabase', () => ({
@@ -13,34 +13,41 @@ describe('useProducts Hook - Unit Tests', () => {
     // Reset mock data
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'products') {
-        return {
-          select: jest.fn().mockReturnValue({
-            then: jest.fn((callback) => 
-              Promise.resolve(callback({ data: mockProducts, error: null }))
-            ),
+        const queryBuilder = {
+          select: jest.fn(() => {
+            const selectQueryBuilder = {
+              eq: jest.fn().mockReturnThis(),
+              order: jest.fn().mockReturnThis(),
+              then: jest.fn((callback) => 
+                Promise.resolve(callback({ data: mockProducts, error: null }))
+              )
+            }
+            return selectQueryBuilder
           }),
-          insert: jest.fn().mockReturnValue({
-            select: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: { ...mockProducts[0], id: 'new-id' },
-                error: null,
-              }),
-            }),
-          }),
-          update: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue({
-              select: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({
-                  data: mockProducts[0],
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-          delete: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({ error: null }),
+          insert: jest.fn().mockReturnThis(),
+          update: jest.fn().mockReturnThis(),
+          delete: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { ...mockProducts[0], id: 'new-id' },
+            error: null,
           }),
         }
+        return queryBuilder
+      } else if (table === 'product_units') {
+        const queryBuilder = {
+          select: jest.fn(() => {
+            const selectQueryBuilder = {
+              order: jest.fn().mockReturnThis(),
+              then: jest.fn((callback) => 
+                Promise.resolve(callback({ data: [], error: null }))
+              )
+            }
+            return selectQueryBuilder
+          }),
+          insert: jest.fn().mockReturnThis(),
+          delete: jest.fn().mockReturnThis(),
+        }
+        return queryBuilder
       }
       return {}
     })
@@ -212,23 +219,64 @@ describe('useProducts Hook - Unit Tests', () => {
     })
 
     it('should handle stock update errors', async () => {
-      mockSupabaseClient.from.mockImplementation(() => ({
-        select: jest.fn().mockReturnValue({
-          then: jest.fn((callback) => 
-            Promise.resolve(callback({ data: mockProducts, error: null }))
-          ),
-        }),
-        update: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            select: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: null,
-                error: { message: 'Stock update failed' },
-              }),
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'products') {
+          const queryBuilder = {
+            select: jest.fn(() => {
+              const selectQueryBuilder = {
+                eq: jest.fn().mockReturnThis(),
+                order: jest.fn().mockReturnThis(),
+                then: jest.fn((callback) => 
+                  Promise.resolve(callback({ data: mockProducts, error: null }))
+                )
+              }
+              return selectQueryBuilder
             }),
-          }),
-        }),
-      }))
+            update: jest.fn(() => {
+              const updateQueryBuilder = {
+                eq: jest.fn(() => {
+                  const eqQueryBuilder = {
+                    select: jest.fn(() => {
+                      const selectQueryBuilder = {
+                        single: jest.fn().mockResolvedValue({
+                          data: null,
+                          error: { message: 'Stock update failed' },
+                        }),
+                      }
+                      return selectQueryBuilder
+                    }),
+                  }
+                  return eqQueryBuilder
+                }),
+              }
+              return updateQueryBuilder
+            }),
+            insert: jest.fn().mockReturnThis(),
+            delete: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { ...mockProducts[0], id: 'new-id' },
+              error: null,
+            }),
+          }
+          return queryBuilder
+        } else if (table === 'product_units') {
+          const queryBuilder = {
+            select: jest.fn(() => {
+              const selectQueryBuilder = {
+                order: jest.fn().mockReturnThis(),
+                then: jest.fn((callback) => 
+                  Promise.resolve(callback({ data: [], error: null }))
+                )
+              }
+              return selectQueryBuilder
+            }),
+            insert: jest.fn().mockReturnThis(),
+            delete: jest.fn().mockReturnThis(),
+          }
+          return queryBuilder
+        }
+        return {}
+      })
 
       const { result } = renderHook(() => useProducts())
       
@@ -264,18 +312,82 @@ describe('useProducts Hook - Unit Tests', () => {
     })
 
     it('should handle deletion errors', async () => {
-      mockSupabaseClient.from.mockImplementation(() => ({
-        select: jest.fn().mockReturnValue({
-          then: jest.fn((callback) => 
-            Promise.resolve(callback({ data: mockProducts, error: null }))
-          ),
-        }),
-        delete: jest.fn().mockReturnValue({
-          eq: jest.fn().mockResolvedValue({
-            error: { message: 'Deletion failed' },
-          }),
-        }),
-      }))
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'products') {
+          const queryBuilder = {
+            select: jest.fn(() => {
+              const selectQueryBuilder = {
+                eq: jest.fn().mockReturnThis(),
+                order: jest.fn().mockReturnThis(),
+                then: jest.fn((callback) => 
+                  Promise.resolve(callback({ data: mockProducts, error: null }))
+                )
+              }
+              return selectQueryBuilder
+            }),
+            update: jest.fn(() => {
+              const updateQueryBuilder = {
+                eq: jest.fn(() => {
+                  const eqQueryBuilder = {
+                    select: jest.fn(() => {
+                      const selectQueryBuilder = {
+                        single: jest.fn().mockResolvedValue({
+                          data: null,
+                          error: { message: 'Stock update failed' },
+                        }),
+                      }
+                      return selectQueryBuilder
+                    }),
+                  }
+                  return eqQueryBuilder
+                }),
+              }
+              return updateQueryBuilder
+            }),
+            delete: jest.fn(() => {
+              const deleteQueryBuilder = {
+                eq: jest.fn(() => {
+                  const eqQueryBuilder = {
+                    select: jest.fn(() => {
+                      const selectQueryBuilder = {
+                        single: jest.fn().mockResolvedValue({
+                          data: null,
+                          error: { message: 'Deletion failed' },
+                        }),
+                      }
+                      return selectQueryBuilder
+                    }),
+                  }
+                  return eqQueryBuilder
+                }),
+              }
+              return deleteQueryBuilder
+            }),
+            insert: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { ...mockProducts[0], id: 'new-id' },
+              error: null,
+            }),
+          }
+          return queryBuilder
+        } else if (table === 'product_units') {
+          const queryBuilder = {
+            select: jest.fn(() => {
+              const selectQueryBuilder = {
+                order: jest.fn().mockReturnThis(),
+                then: jest.fn((callback) => 
+                  Promise.resolve(callback({ data: [], error: null }))
+                )
+              }
+              return selectQueryBuilder
+            }),
+            insert: jest.fn().mockReturnThis(),
+            delete: jest.fn().mockReturnThis(),
+          }
+          return queryBuilder
+        }
+        return {}
+      })
 
       const { result } = renderHook(() => useProducts())
       
