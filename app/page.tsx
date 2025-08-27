@@ -121,6 +121,14 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
     setCart((prev) => {
       const currentQty = prev[productId] || 0
       const newQty = Math.max(0, currentQty + change)
+      
+      // Validate against available stock
+      const product = products.find(p => p.id === productId)
+      if (product && newQty > product.stock) {
+        alert(`Cannot add more items. Only ${product.stock} items available in stock.`)
+        return prev
+      }
+      
       return { ...prev, [productId]: newQty }
     })
   }
@@ -586,7 +594,7 @@ function POSScreen({ onBack, products, categories, setCurrentScreen, createTrans
   )
 }
 
-function InventoryScreen({ products, categories, setProducts, setCurrentScreen }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">> }) {
+function InventoryScreen({ products, categories, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleAddStock, handleDuplicateProduct }: { products: any[]; categories: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; handleEditProduct: any; handleDeleteProduct: any; handleAddStock: any; handleDuplicateProduct: any }) {
   const [activeTab, setActiveTab] = useState<"list" | "replenishment">("list")
   const [showStockAtCategory, setShowStockAtCategory] = useState(true)
   const [showStockInPOS, setShowStockInPOS] = useState(true)
@@ -602,7 +610,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
       .reduce((sum, product) => sum + product.stock, 0)
   }
 
-  const handleEditProduct = (product: any) => {
+  const handleEditProductLocal = async (product: any) => {
     setEditingProduct(product.id)
     setEditForm({
       name: product.name,
@@ -611,26 +619,25 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
     })
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((product) => (product.id === editingProduct ? { ...product, ...editForm } : product)),
-      )
-      setEditingProduct(null)
+      try {
+        const result = await handleEditProduct(editingProduct, editForm)
+        
+        if (result.success) {
+          setEditingProduct(null)
+          // Local state will be updated via real-time subscription
+        } else {
+          alert(`Failed to update product: ${result.error}`)
+        }
+      } catch (error) {
+        console.error('Error updating product:', error)
+        alert(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
     }
   }
 
-  const handleDeleteProduct = (productId: number) => {
-    setProducts((prev) => prev.filter((product) => product.id !== productId))
-  }
 
-  const handleAddStock = (productId: number, amount: number) => {
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.id === productId ? { ...product, stock: Math.max(0, product.stock + amount) } : product,
-      ),
-    )
-  }
 
   return (
     <div className="h-screen bg-gray-100 max-w-sm mx-auto flex flex-col">
@@ -798,7 +805,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
                                   +
                                 </button>
                                 <button
-                                  onClick={() => handleEditProduct(product)}
+                                  onClick={() => handleEditProductLocal(product)}
                                   className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors"
                                   title="Edit product"
                                 >
@@ -867,7 +874,7 @@ function InventoryScreen({ products, categories, setProducts, setCurrentScreen }
   )
 }
 
-function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">> }) {
+function ProductsScreen({ onBack, products, setProducts, setCurrentScreen, handleEditProduct, handleDeleteProduct, handleDuplicateProduct, handleCreateProduct, handleBulkDeleteProducts, categories }: { onBack: () => void; products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; setCurrentScreen: React.Dispatch<React.SetStateAction<"dashboard" | "pos" | "inventory" | "products" | "add-product">>; handleEditProduct: any; handleDeleteProduct: any; handleDuplicateProduct: any; handleCreateProduct: any; handleBulkDeleteProducts: any; categories: any[] }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [bulkEditMode, setBulkEditMode] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
@@ -910,7 +917,7 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
     {} as Record<string, typeof products>,
   )
 
-  const handleEditProduct = (product: any) => {
+  const handleEditProductLocal = (product: any) => {
     setEditingProduct(product.id)
     setEditForm({
       name: product.name,
@@ -920,48 +927,119 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
     })
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((product) => (product.id === editingProduct ? { ...product, ...editForm } : product)),
-      )
-      setEditingProduct(null)
+      try {
+        const result = await handleEditProduct(editingProduct, {
+          name: editForm.name,
+          stock: editForm.stock,
+          price: editForm.price
+        })
+        
+        if (result.success) {
+          setEditingProduct(null)
+          // Local state will be updated via real-time subscription
+        } else {
+          alert(`Failed to update product: ${result.error}`)
+        }
+      } catch (error) {
+        console.error('Error updating product:', error)
+        alert(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
     }
   }
 
-  const handleDeleteProduct = (productId: number) => {
-    setProducts((prev) => prev.filter((product) => product.id !== productId))
-  }
-
-  const handleDuplicateProduct = (product: any) => {
-    const newProduct = {
-      ...product,
-      id: Math.max(...products.map((p) => p.id)) + 1,
-      name: `${product.name} (Copy)`,
+  const handleDeleteProductLocal = async (productId: number) => {
+    if (!confirm('Are you sure you want to delete this product?')) {
+      return
     }
-    setProducts((prev) => [...prev, newProduct])
-  }
-
-  const handleBulkDelete = () => {
-    setProducts((prev) => prev.filter((product) => !selectedProducts.includes(product.id)))
-    setSelectedProducts([])
-    setBulkEditMode(false)
-  }
-
-  const handleAddProduct = () => {
-    const newProduct = {
-      ...newProductForm,
-      id: Math.max(...products.map((p) => p.id)) + 1,
+    
+    try {
+      const result = await handleDeleteProduct(productId.toString())
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+      } else {
+        alert(`Failed to delete product: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      alert(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-    setProducts((prev) => [...prev, newProduct])
-    setNewProductForm({
-      name: "",
-      price: 0,
-      stock: 0,
-      category: "Baby Powder",
-      image: "/placeholder.svg",
-    })
-    setShowAddForm(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.length === 0) return
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedProducts.length} selected product${selectedProducts.length > 1 ? 's' : ''}?`
+    if (!confirm(confirmMessage)) {
+      return
+    }
+    
+    try {
+      const result = await handleBulkDeleteProducts(selectedProducts.map(id => id.toString()))
+      
+      if (result.success) {
+        alert(`Successfully deleted ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}!`)
+        setSelectedProducts([])
+        setBulkEditMode(false)
+      } else {
+        alert(`Failed to delete products: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error in bulk delete:', error)
+      alert(`Failed to delete products: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleAddProduct = async () => {
+    if (!newProductForm.name || newProductForm.price <= 0) {
+      alert('Please fill in all required fields (name and price).')
+      return
+    }
+    
+    try {
+      // Find the category_id for the selected category
+      const selectedCategory = categories.find((cat: any) => cat.name === newProductForm.category)
+      if (!selectedCategory) {
+        alert('Invalid category selected.')
+        return
+      }
+      
+      const newProduct = {
+        name: newProductForm.name,
+        description: '',
+        sku: `PROD-${Date.now()}`,
+        category_id: selectedCategory.id,
+        price_retail: newProductForm.price,
+        price_wholesale: null,
+        cost: 0,
+        stock: newProductForm.stock,
+        unit: 'pcs',
+        image_url: newProductForm.image === '/placeholder.svg' ? null : newProductForm.image
+      }
+      
+      const result = await handleCreateProduct(newProduct)
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+        // Reset form and close
+        setNewProductForm({
+          name: '',
+          price: 0,
+          stock: 0,
+          category: 'Baby Powder',
+          image: '/placeholder.svg',
+        })
+        setShowAddForm(false)
+        alert('Product added successfully!')
+      } else {
+        alert(`Failed to add product: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error adding product:', error)
+      alert(`Failed to add product: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   const toggleProductSelection = (productId: number) => {
@@ -1161,19 +1239,31 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
                       {!bulkEditMode && editingProduct !== product.id && (
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleEditProduct(product)}
+                            onClick={() => handleEditProductLocal(product)}
                             className="w-8 h-8 bg-blue-500 text-white rounded flex items-center justify-center"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteProduct(product.id)}
+                            onClick={() => handleDeleteProductLocal(product.id)}
                             className="w-8 h-8 bg-red-500 text-white rounded flex items-center justify-center"
                           >
                             <X className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDuplicateProduct(product)}
+                            onClick={async () => {
+                              try {
+                                const result = await handleDuplicateProduct(product)
+                                if (result.success) {
+                                  alert('Product duplicated successfully!')
+                                } else {
+                                  alert(`Failed to duplicate product: ${result.error}`)
+                                }
+                              } catch (error) {
+                                console.error('Error duplicating product:', error)
+                                alert(`Failed to duplicate product: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                              }
+                            }}
                             className="w-8 h-8 bg-gray-500 text-white rounded flex items-center justify-center"
                           >
                             <FileText className="w-4 h-4" />
@@ -1254,6 +1344,123 @@ export default function Dashboard() {
     console.log('Product update requested')
   }
 
+  // Supabase-dependent functions that need to be accessible to nested components
+  const handleEditProduct = async (productId: number, editForm: {name: string, stock: number, price: number}) => {
+    try {
+      const result = await updateProduct(productId.toString(), {
+        name: editForm.name,
+        stock: editForm.stock,
+        price_retail: editForm.price
+      })
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+        return { success: true }
+      } else {
+        return { success: false, error: result.error }
+      }
+    } catch (error) {
+      console.error('Error updating product:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      const result = await deleteProduct(productId)
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+        return { success: true }
+      } else {
+        return { success: false, error: result.error }
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  const handleAddStock = async (productId: string, newStock: number) => {
+    try {
+      const result = await updateStock(productId, newStock)
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+        return { success: true }
+      } else {
+        return { success: false, error: result.error }
+      }
+    } catch (error) {
+      console.error('Error updating stock:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  const handleDuplicateProduct = async (product: any) => {
+    try {
+      const duplicatedProduct = {
+        name: `${product.name} (Copy)`,
+        description: product.description || '',
+        sku: `${product.sku || 'COPY'}-${Date.now()}`,
+        category_id: product.category_id,
+        price_retail: product.price,
+        price_wholesale: product.price_wholesale || null,
+        cost: product.cost || 0,
+        stock: 0, // Start with 0 stock for duplicate
+        unit: product.unit || 'pcs',
+        image_url: product.image_url || null
+      }
+      
+      const result = await createProduct(duplicatedProduct)
+      
+      if (result.success) {
+        // Products will be updated via real-time subscription
+        return { success: true }
+      } else {
+        return { success: false, error: result.error }
+      }
+    } catch (error) {
+      console.error('Error duplicating product:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  const handleCreateProduct = async (productData: any) => {
+    try {
+      const result = await createProduct(productData)
+      
+      if (result.success) {
+        return { success: true }
+      } else {
+        return { success: false, error: result.error }
+      }
+    } catch (error) {
+      console.error('Error creating product:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  const handleBulkDeleteProducts = async (productIds: string[]) => {
+    try {
+      // Delete products one by one (Supabase doesn't support bulk delete in hooks)
+      const deletePromises = productIds.map(productId => deleteProduct(productId))
+      const results = await Promise.all(deletePromises)
+      
+      // Check if all deletions were successful
+      const failedDeletions = results.filter((result: any) => !result.success)
+      
+      if (failedDeletions.length > 0) {
+        return { success: false, error: `Some deletions failed. ${productIds.length - failedDeletions.length} products deleted successfully.` }
+      } else {
+        return { success: true }
+      }
+    } catch (error) {
+      console.error('Error in bulk delete:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
   const handleSaveNewProduct = async (productData: any) => {
     try {
       // Prepare units for database
@@ -1290,15 +1497,15 @@ export default function Dashboard() {
 
   
       if (currentScreen === "pos") {
-        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={updateStock} fetchProducts={fetchProducts} />
+        return <POSScreen onBack={() => setCurrentScreen("dashboard")} products={products} categories={categories} setCurrentScreen={setCurrentScreen} createTransaction={createTransaction} updateStock={handleAddStock} fetchProducts={fetchProducts} />
       }
 
       if (currentScreen === "inventory") {
-        return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
+        return <InventoryScreen products={products} categories={categories} setProducts={setProducts} setCurrentScreen={setCurrentScreen} handleEditProduct={handleEditProduct} handleDeleteProduct={handleDeleteProduct} handleAddStock={handleAddStock} handleDuplicateProduct={handleDuplicateProduct} />
       }
 
       if (currentScreen === "products") {
-        return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} />
+        return <ProductsScreen onBack={() => setCurrentScreen("dashboard")} products={products} setProducts={setProducts} setCurrentScreen={setCurrentScreen} handleEditProduct={handleEditProduct} handleDeleteProduct={handleDeleteProduct} handleDuplicateProduct={handleDuplicateProduct} handleCreateProduct={handleCreateProduct} handleBulkDeleteProducts={handleBulkDeleteProducts} categories={categories} />
       }
 
       if (currentScreen === "add-product") {

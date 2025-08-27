@@ -153,6 +153,53 @@ export default function AddProduct({ onBack, onSave }: AddProductProps) {
 
   const handleSave = async () => {
     try {
+      // Validate required fields
+      if (!productData.name.trim()) {
+        alert('Product name is required.')
+        return
+      }
+
+      if (!productData.category_id) {
+        alert('Please select a category.')
+        return
+      }
+
+      if (productData.price_retail <= 0) {
+        alert('Product price must be greater than 0.')
+        return
+      }
+
+      if (productData.cost < 0) {
+        alert('Cost cannot be negative.')
+        return
+      }
+
+      if (productData.stock < 0) {
+        alert('Stock cannot be negative.')
+        return
+      }
+
+      // Validate units
+      const validUnits = units.filter(unit => unit.name.trim() !== '')
+      if (validUnits.length === 0) {
+        alert('At least one unit is required.')
+        return
+      }
+
+      // Validate additional units
+      for (const unit of validUnits) {
+        if (!unit.isBase) {
+          if (unit.conversionFactor <= 0) {
+            alert(`Invalid conversion factor for unit "${unit.name}". Must be greater than 0.`)
+            return
+          }
+          if (unit.price < 0) {
+            alert(`Price for unit "${unit.name}" cannot be negative.`)
+            return
+          }
+        }
+      }
+      
       // Create a copy of the product data
       let finalProductData = { ...productData }
       
@@ -164,13 +211,13 @@ export default function AddProduct({ onBack, onSave }: AddProductProps) {
       // Prepare the product data with units
       finalProductData = {
         ...finalProductData,
-        units: units.filter(unit => unit.name.trim() !== '')
+        units: validUnits
       }
 
       await onSave(finalProductData)
     } catch (error) {
       console.error('Error saving product:', error)
-      alert('Failed to save product. Please try again.')
+      alert(`Failed to save product: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 

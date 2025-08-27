@@ -9,12 +9,16 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Enable standalone output for Netlify
-  output: 'export',
-  // Disable server-side features for static export
-  trailingSlash: true,
-  // Required for static export
-  distDir: 'out',
+  // Vercel handles server-side rendering natively
+  // No need for static export - let Vercel use full Next.js features
+  experimental: {
+    // Enable experimental features if needed
+    serverActions: {
+      allowedOrigins: ['*'],
+    },
+  },
+  // Enable server-side features for Vercel
+  trailingSlash: false,
 }
 
 export default nextConfig
