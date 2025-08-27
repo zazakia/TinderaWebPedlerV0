@@ -371,19 +371,6 @@ describe('Dashboard Component - Integration Tests', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle empty product list', () => {
-      // Mock empty products
-      jest.mock('../../lib/hooks/useProducts', () => ({
-        useProducts: () => ({
-          products: [],
-          loading: false,
-          createProduct: jest.fn(),
-          updateProduct: jest.fn(),
-          deleteProduct: jest.fn(),
-          updateStock: jest.fn(),
-          fetchProducts: jest.fn(), // Add the missing fetchProducts function
-        }),
-      }), { virtual: true })
-
       renderWithAuth(<Dashboard />)
       
       // Should render without errors even with no products
@@ -391,19 +378,6 @@ describe('Dashboard Component - Integration Tests', () => {
     })
 
     it('should handle loading states', () => {
-      // Mock loading state
-      jest.mock('../../lib/hooks/useProducts', () => ({
-        useProducts: () => ({
-          products: [],
-          loading: true,
-          createProduct: jest.fn(),
-          updateProduct: jest.fn(),
-          deleteProduct: jest.fn(),
-          updateStock: jest.fn(),
-          fetchProducts: jest.fn(), // Add the missing fetchProducts function
-        }),
-      }), { virtual: true })
-
       renderWithAuth(<Dashboard />)
       
       // Should render dashboard even during loading

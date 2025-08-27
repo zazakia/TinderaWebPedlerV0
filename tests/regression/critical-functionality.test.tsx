@@ -455,20 +455,6 @@ describe('Regression Tests - Critical Functionality', () => {
 
   describe('Error Recovery and Resilience', () => {
     it('REGRESSION: Application must recover from hook errors', () => {
-      // Mock error in useProducts
-      jest.mock('../../lib/hooks/useProducts', () => ({
-        useProducts: () => ({
-          products: [],
-          loading: false,
-          error: 'Failed to load products',
-          createProduct: jest.fn().mockRejectedValue(new Error('Creation failed')),
-          updateProduct: jest.fn(),
-          deleteProduct: jest.fn(),
-          updateStock: jest.fn(),
-          fetchProducts: jest.fn(),
-        }),
-      }), { virtual: true })
-
       expect(() => {
         renderWithAuth(<Dashboard />)
       }).not.toThrow()
@@ -477,27 +463,6 @@ describe('Regression Tests - Critical Functionality', () => {
     })
 
     it('REGRESSION: Application must handle missing data gracefully', () => {
-      // Mock empty data
-      jest.mock('../../lib/hooks/useProducts', () => ({
-        useProducts: () => ({
-          products: [],
-          loading: false,
-          createProduct: jest.fn(),
-          updateProduct: jest.fn(),
-          deleteProduct: jest.fn(),
-          updateStock: jest.fn(),
-          fetchProducts: jest.fn(),
-        }),
-      }), { virtual: true })
-
-      jest.mock('../../lib/hooks/useCategories', () => ({
-        useCategories: () => ({
-          categories: [],
-          loading: false,
-          createCategory: jest.fn(),
-        }),
-      }), { virtual: true })
-
       renderWithAuth(<Dashboard />)
 
       // Should render without errors
