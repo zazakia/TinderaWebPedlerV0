@@ -1315,12 +1315,25 @@ function ProductsScreen({ onBack, products, setProducts, setCurrentScreen }: { o
             </div>
           </div>
         </div>
-    </div>
-  )
-}
+            <div className="min-h-screen bg-gray-50">
+              {/* Header */}
+              <div className="bg-white px-4 py-3 flex items-center border-b">
+                <ArrowLeft
+                  className="w-6 h-6 text-gray-600 cursor-pointer"
+                  onClick={() => setShowAddProductForm(false)}
+                />
+                <h1 className="text-xl font-semibold ml-4">Add Product</h1>
+              </div>
 
-export default function Dashboard() {
-  const [currentScreen, setCurrentScreen] = useState<"dashboard" | "pos" | "inventory" | "products" | "addProduct">(
+              <div className="p-4 pb-20">
+                {/* Product Preview Section */}
+                <div className="flex gap-4 mb-6">
+                  {/* Color Selector */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Color</label>
+                    <div
+                      className="w-12 h-12 rounded border-2 border-gray-300 cursor-pointer"
+                      style={{ backgroundColor: addProductForm.color }}
                       onClick={() => {
                         const colors = ["#1e40af", "#dc2626", "#059669", "#7c3aed", "#ea580c", "#0891b2"]
                         const currentIndex = colors.indexOf(addProductForm.color)
@@ -1673,6 +1686,310 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Multi-Unit of Measure Settings */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Unit of Measure Settings</h3>
+            <p className="text-sm text-gray-600 mb-4 italic">
+              Configure unique units and pricing for this specific product
+            </p>
+
+            {/* Base Unit Selection */}
+            <div className="mb-4">
+              <label className="block text-gray-700 mb-2 font-medium">Base Unit:</label>
+              <select
+                className="w-full p-3 border border-gray-300 rounded bg-white"
+                value={addProductForm.baseUnit}
+                onChange={(e) => {
+                  const newBaseUnit = e.target.value
+                  setAddProductForm((prev) => ({
+                    ...prev,
+                    baseUnit: newBaseUnit,
+                    units: prev.units.map((unit, index) => ({
+                      ...unit,
+                      isBase: index === 0 ? unit.name === newBaseUnit : false,
+                      name: index === 0 ? newBaseUnit : unit.name,
+                    })),
+                  }))
+                }}
+              >
+                <option value="piece">Piece</option>
+                <option value="kilogram">Kilogram</option>
+                <option value="liter">Liter</option>
+                <option value="meter">Meter</option>
+                <option value="gram">Gram</option>
+                <option value="bottle">Bottle</option>
+                <option value="can">Can</option>
+                <option value="sachet">Sachet</option>
+              </select>
+            </div>
+
+            {/* Additional Units Configuration */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-700">Additional Units for this Product (Max 5):</h4>
+              {addProductForm.units.slice(1).map((unit, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-3 bg-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="font-medium text-gray-600">Unit {index + 2}</h5>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">{unit.type === "retail" ? "Retail" : "Wholesale"}</span>
+                      <button
+                        onClick={() => {
+                          const newUnits = [...addProductForm.units]
+                          newUnits[index + 1].type = newUnits[index + 1].type === "retail" ? "wholesale" : "retail"
+                          setAddProductForm((prev) => ({ ...prev, units: newUnits }))
+                        }}
+                        className={`px-2 py-1 rounded text-xs ${
+                          unit.type === "wholesale" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
+                        }`}
+                      >
+                        {unit.type === "retail" ? "R" : "W"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Unit Name */}
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Unit Name:</label>
+                      <select
+                        className="w-full p-2 border border-gray-300 rounded text-sm"
+                        value={unit.name}
+                        onChange={(e) => {
+                          const newUnits = [...addProductForm.units]
+                          newUnits[index + 1].name = e.target.value
+                          setAddProductForm((prev) => ({ ...prev, units: newUnits }))
+                        }}
+                      >
+                        <option value="box">Box</option>
+                        <option value="case">Case</option>
+                        <option value="dozen">Dozen</option>
+                        <option value="pack">Pack</option>
+                        <option value="carton">Carton</option>
+                        <option value="sack">Sack</option>
+                        <option value="bag">Bag</option>
+                        <option value="bundle">Bundle</option>
+                        <option value="roll">Roll</option>
+                        <option value="gallon">Gallon</option>
+                      </select>
+                    </div>
+
+                    {/* Conversion Factor */}
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        Conversion Factor (How many {addProductForm.baseUnit}s in 1 {unit.name}):
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full p-2 border border-gray-300 rounded text-sm"
+                        value={unit.conversionFactor}
+                        onChange={(e) => {
+                          const newUnits = [...addProductForm.units]
+                          newUnits[index + 1].conversionFactor = Number(e.target.value) || 1
+                          setAddProductForm((prev) => ({ ...prev, units: newUnits }))
+                        }}
+                        min="1"
+                        step="0.1"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        1 {unit.name} = {unit.conversionFactor} {addProductForm.baseUnit}(s)
+                      </p>
+                    </div>
+
+                    {/* Unit Price */}
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">
+                        Price per {unit.name} ({unit.type === "retail" ? "Retail" : "Wholesale"}):
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">₱</span>
+                        <input
+                          type="number"
+                          className="flex-1 p-2 border border-gray-300 rounded text-sm"
+                          value={unit.price}
+                          onChange={(e) => {
+                            const newUnits = [...addProductForm.units]
+                            newUnits[index + 1].price = e.target.value
+                            setAddProductForm((prev) => ({ ...prev, units: newUnits }))
+                          }}
+                          step="0.01"
+                        />
+                        <button
+                          onClick={() => {
+                            if (addProductForm.price) {
+                              const basePrice = Number(addProductForm.price)
+                              const suggestedPrice =
+                                unit.type === "wholesale"
+                                  ? basePrice * unit.conversionFactor * 0.9 // 10% bulk discount
+                                  : basePrice * unit.conversionFactor
+                              const newUnits = [...addProductForm.units]
+                              newUnits[index + 1].price = suggestedPrice.toFixed(2)
+                              setAddProductForm((prev) => ({ ...prev, units: newUnits }))
+                            }
+                          }}
+                          className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs hover:bg-purple-200"
+                          title="Auto-calculate based on base price"
+                        >
+                          Auto
+                        </button>
+                      </div>
+                      {unit.price && addProductForm.price && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Per {addProductForm.baseUnit}: ₱{(Number(unit.price) / unit.conversionFactor).toFixed(2)}
+                          {unit.type === "wholesale" && (
+                            <span className="text-green-600 ml-1">
+                              (
+                              {(
+                                ((Number(addProductForm.price) - Number(unit.price) / unit.conversionFactor) /
+                                  Number(addProductForm.price)) *
+                                100
+                              ).toFixed(1)}
+                              % bulk discount)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Unit Summary */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <h5 className="font-medium text-blue-800 mb-3 flex items-center gap-2">
+                <Calculator className="w-4 h-4" />
+                Unit Configuration Summary for This Product:
+              </h5>
+              <div className="space-y-2 text-sm">
+                {addProductForm.units.map((unit, index) => (
+                  <div key={index} className="flex justify-between items-center py-1 px-2 bg-white rounded border">
+                    <span className="text-blue-700 font-medium">
+                      1 {unit.name}{" "}
+                      {unit.isBase ? "(Base Unit)" : `= ${unit.conversionFactor} ${addProductForm.baseUnit}(s)`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-800 font-semibold">
+                        ₱{unit.price || (unit.isBase ? addProductForm.price : "0.00")}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          unit.type === "wholesale" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
+                        }`}
+                      >
+                        {unit.type}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-blue-600 italic">
+                💡 These units will be available in POS for sales and inventory management
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Products List */}
+      <div className="px-4 pb-24">
+        {Object.entries(groupedProducts).map(([category, categoryProducts]) => (
+          <div key={category} className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-700 mb-3">{category}</h2>
+            <div className="space-y-3">
+              {categoryProducts.map((product) => (
+                <div key={product.id} className="bg-white rounded-lg p-3 flex items-center gap-3">
+                  {bulkEditMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedProducts.includes(product.id)}
+                      onChange={() => toggleProductSelection(product.id)}
+                      className="w-4 h-4"
+                    />
+                  )}
+
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <img
+                      src={product.image || "/placeholder.svg"}
+                      alt={product.name}
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+
+                  {editingProduct === product.id ? (
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                        className="text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={editForm.price}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                          className="text-sm"
+                          placeholder="Price"
+                        />
+                        <Input
+                          type="number"
+                          value={editForm.stock}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, stock: Number(e.target.value) }))}
+                          className="text-sm"
+                          placeholder="Stock"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveEdit}
+                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-xs"
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          onClick={() => setEditingProduct(null)}
+                          className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 text-xs"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-800">{product.name}</h3>
+                      <p className="text-lg font-bold text-gray-900">₱{product.price.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                    </div>
+                  )}
+
+                  {!bulkEditMode && editingProduct !== product.id && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        className="w-8 h-8 bg-blue-500 text-white rounded flex items-center justify-center"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="w-8 h-8 bg-red-500 text-white rounded flex items-center justify-center"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDuplicateProduct(product)}
+                        className="w-8 h-8 bg-gray-500 text-white rounded flex items-center justify-center"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200">
