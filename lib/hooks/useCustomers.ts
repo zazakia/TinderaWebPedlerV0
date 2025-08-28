@@ -1,210 +1,141 @@
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { Database } from '@/types/database'
-
-type Customer = Database['public']['Tables']['customers']['Row']
-type CustomerInsert = Database['public']['Tables']['customers']['Insert']
-type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+import { useState, useEffect } from "react";
+import { supabase, type Customer } from "@/lib/supabase";
 
 export function useCustomers() {
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch all customers
+  // Fetch customers
   const fetchCustomers = async () => {
     try {
-      setLoading(true)
-      setError(null)
-
+      setLoading(true);
       const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
+        .from("customers")
+        .select("*")
+        .order("name");
 
-      if (error) throw error
-      setCustomers(data || [])
+      if (error) throw error;
+
+      setCustomers(data || []);
+      setError(null);
     } catch (err) {
-      console.error('Error fetching customers:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch customers')
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch customers",
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Create a new customer
-  const createCustomer = async (customer: CustomerInsert) => {
+  // Create customer
+  const createCustomer = async (customerData: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+  }) => {
     try {
       const { data, error } = await supabase
-        .from('customers')
-        .insert(customer)
+        .from("customers")
+        .insert([customerData])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCustomers() // Refresh the customers list
-      return { success: true, data }
+      await fetchCustomers(); // Refresh the list
+      return data;
     } catch (err) {
-      console.error('Error creating customer:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to create customer' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to create customer",
+      );
     }
-  }
+  };
 
-  // Update a customer
-  const updateCustomer = async (id: string, updates: CustomerUpdate) => {
+  // Update customer
+  const updateCustomer = async (id: string, updates: Partial<Customer>) => {
     try {
-      const { error } = await supabase
-        .from('customers')
+      const { data, error } = await supabase
+        .from("customers")
         .update(updates)
-        .eq('id', id)
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCustomers() // Refresh the customers list
-      return { success: true }
+      await fetchCustomers(); // Refresh the list
+      return data;
     } catch (err) {
-      console.error('Error updating customer:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to update customer' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to update customer",
+      );
     }
-  }
+  };
 
-  // Delete a customer (soft delete)
+  // Delete customer
   const deleteCustomer = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('customers')
-        .update({ is_active: false })
-        .eq('id', id)
+      const { error } = await supabase.from("customers").delete().eq("id", id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCustomers() // Refresh the customers list
-      return { success: true }
+      await fetchCustomers(); // Refresh the list
     } catch (err) {
-      console.error('Error deleting customer:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to delete customer' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to delete customer",
+      );
     }
-  }
+  };
 
-  // Get customers with outstanding balance
-  const getCustomersWithBalance = async () => {
+  // Get customer by id
+  const getCustomerById = (id: string) => {
+    return customers.find((customer) => customer.id === id);
+  };
+
+  // Get customer by name
+  const getCustomerByName = (name: string) => {
+    return customers.find(
+      (customer) => customer.name.toLowerCase() === name.toLowerCase(),
+    );
+  };
+
+  // Search customers
+  const searchCustomers = async (query: string) => {
     try {
       const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .gt('current_balance', 0)
-        .eq('is_active', true)
-        .order('current_balance', { ascending: false })
+        .from("customers")
+        .select("*")
+        .or(
+          `name.ilike.%${query}%, email.ilike.%${query}%, phone.ilike.%${query}%`,
+        )
+        .order("name");
 
-      if (error) throw error
-      return { success: true, data }
+      if (error) throw error;
+      return data || [];
     } catch (err) {
-      console.error('Error fetching customers with balance:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch customers with balance' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to search customers",
+      );
     }
-  }
+  };
 
-  // Record credit payment
-  const recordCreditPayment = async (customerId: string, amount: number, paymentMethod: string, transactionId?: string, notes?: string) => {
-    try {
-      const { error } = await supabase
-        .from('credit_payments')
-        .insert({
-          customer_id: customerId,
-          transaction_id: transactionId,
-          amount,
-          payment_method: paymentMethod,
-          notes
-        })
-
-      if (error) throw error
-
-      await fetchCustomers() // Refresh to get updated balance
-      return { success: true }
-    } catch (err) {
-      console.error('Error recording credit payment:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to record credit payment' }
-    }
-  }
-
-  // Get customer transaction history
-  const getCustomerTransactions = async (customerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return { success: true, data }
-    } catch (err) {
-      console.error('Error fetching customer transactions:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch customer transactions' }
-    }
-  }
-
-  // Get customer credit payments
-  const getCustomerCreditPayments = async (customerId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('credit_payments')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return { success: true, data }
-    } catch (err) {
-      console.error('Error fetching customer credit payments:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch customer credit payments' }
-    }
-  }
-
-  // Initial fetch
   useEffect(() => {
-    fetchCustomers()
-  }, [])
-
-  // Subscribe to real-time changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('customers-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'customers' },
-        () => {
-          fetchCustomers()
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'credit_payments' },
-        () => {
-          fetchCustomers() // Refresh when credit payments are made
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+    fetchCustomers();
+  }, []);
 
   return {
     customers,
     loading,
     error,
-    fetchCustomers,
     createCustomer,
     updateCustomer,
     deleteCustomer,
-    getCustomersWithBalance,
-    recordCreditPayment,
-    getCustomerTransactions,
-    getCustomerCreditPayments
-  }
+    getCustomerById,
+    getCustomerByName,
+    searchCustomers,
+    refetch: fetchCustomers,
+  };
 }

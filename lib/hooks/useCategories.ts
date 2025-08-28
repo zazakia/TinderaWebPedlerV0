@@ -1,123 +1,114 @@
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { Database } from '@/types/database'
-
-type Category = Database['public']['Tables']['categories']['Row']
-type CategoryInsert = Database['public']['Tables']['categories']['Insert']
-type CategoryUpdate = Database['public']['Tables']['categories']['Update']
+import { useState, useEffect } from "react";
+import { supabase, type Category } from "@/lib/supabase";
 
 export function useCategories() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch all categories
+  // Fetch categories
   const fetchCategories = async () => {
     try {
-      setLoading(true)
-      setError(null)
-
+      setLoading(true);
       const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
+        .from("categories")
+        .select("*")
+        .order("name");
 
-      if (error) throw error
-      setCategories(data || [])
+      if (error) throw error;
+
+      setCategories(data || []);
+      setError(null);
     } catch (err) {
-      console.error('Error fetching categories:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch categories')
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch categories",
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Create a new category
-  const createCategory = async (category: CategoryInsert) => {
+  // Create category
+  const createCategory = async (name: string) => {
     try {
       const { data, error } = await supabase
-        .from('categories')
-        .insert(category)
+        .from("categories")
+        .insert([{ name }])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCategories() // Refresh the categories list
-      return { success: true, data }
+      await fetchCategories(); // Refresh the list
+      return data;
     } catch (err) {
-      console.error('Error creating category:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to create category' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to create category",
+      );
     }
-  }
+  };
 
-  // Update a category
-  const updateCategory = async (id: string, updates: CategoryUpdate) => {
+  // Update category
+  const updateCategory = async (id: string, name: string) => {
     try {
-      const { error } = await supabase
-        .from('categories')
-        .update(updates)
-        .eq('id', id)
+      const { data, error } = await supabase
+        .from("categories")
+        .update({ name })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCategories() // Refresh the categories list
-      return { success: true }
+      await fetchCategories(); // Refresh the list
+      return data;
     } catch (err) {
-      console.error('Error updating category:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to update category' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to update category",
+      );
     }
-  }
+  };
 
-  // Delete a category
+  // Delete category
   const deleteCategory = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id)
+      const { error } = await supabase.from("categories").delete().eq("id", id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      await fetchCategories() // Refresh the categories list
-      return { success: true }
+      await fetchCategories(); // Refresh the list
     } catch (err) {
-      console.error('Error deleting category:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to delete category' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to delete category",
+      );
     }
-  }
+  };
 
-  // Initial fetch
+  // Get category by id
+  const getCategoryById = (id: string) => {
+    return categories.find((category) => category.id === id);
+  };
+
+  // Get category by name
+  const getCategoryByName = (name: string) => {
+    return categories.find(
+      (category) => category.name.toLowerCase() === name.toLowerCase(),
+    );
+  };
+
   useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  // Subscribe to real-time changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('categories-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'categories' },
-        () => {
-          fetchCategories()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+    fetchCategories();
+  }, []);
 
   return {
     categories,
     loading,
     error,
-    fetchCategories,
     createCategory,
     updateCategory,
-    deleteCategory
-  }
+    deleteCategory,
+    getCategoryById,
+    getCategoryByName,
+    refetch: fetchCategories,
+  };
 }

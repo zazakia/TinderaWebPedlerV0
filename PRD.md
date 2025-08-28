@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
-## POS Mobile App for Peddlers & Small Retailers
+##  TindahanKO - Customized and  flexible POS - user friendly best UI and UX - Web and Mobile App for Retailers and whole sellers
 
-**Version:** 1.0  
-**Date:** January 2025  
-**Author:** Product Team  
+**Version:** 1.0
+**Date:** August 2025
+**Author:** Product Team
 **Status:** Draft
 
 ---
@@ -23,12 +23,14 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
   - Support for offline/online hybrid operations
 
 ### 1.3 Technology Stack
-- **Framework:** Next.js 15 with App Router
+- **Framework:** Next.js 15 with App Router, typescript
 - **UI Components:** shadcn/ui (Radix UI primitives)
 - **Styling:** Tailwind CSS
 - **State Management:** React Hooks
 - **Package Manager:** pnpm
 - **Deployment:** Vercel (pinoygym-1432 account)
+- supabase, prisma, supabase auth,
+
 
 ---
 
@@ -170,8 +172,8 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Base unit selection (piece, kilogram, liter, etc.)
 - Additional units (box, case, dozen, pack, carton)
 - Conversion ratios (1 box = 12 pieces)
-- Price per unit with bulk discounts
-- Type designation (Retail/Wholesale)
+- Wholesale Price per unit with bulk discounts
+
 
 ### 3.4 Product Management
 
@@ -235,6 +237,7 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Credit/utang tracking
 - Payment history
 - Notes per customer
+- integrate to listbox in transactions related to customer like in POS
 
 #### 3.5.2 Receipt Management
 **User Story:** As a cashier, I want to provide receipts to customers.
@@ -246,7 +249,7 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Business name display
 - Item details with quantities and prices
 - Additional charges (service fee, delivery fee)
-- Discount application
+- Discount application per Item or per receipt or per transaction or per customer
 
 #### 3.5.3 Non-Inventory Sales
 **User Story:** As a cashier, I want to sell items not in the system.
@@ -263,11 +266,11 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ### 4.1 Performance
 - Page load time < 2 seconds on 3G connection
 - Smooth scrolling and transitions
-- Responsive design for 320px - 768px screens
-- Offline capability for critical functions
+- Responsive design for 320px - 768px screens for phone and tablets
+- skip this Offline capability for critical functions dont do this for now
 
 ### 4.2 Data Management
-- Local storage for offline mode
+- skip this Local storage for offline mode
 - Real-time sync when online
 - Data validation on all inputs
 - Decimal support for quantities (0.5, 1.5, etc.)
@@ -306,7 +309,6 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Clear, readable fonts
 - Hierarchical text sizes
 - High contrast ratios
-- Support for Filipino language
 
 ### 5.4 Navigation Pattern
 - Bottom navigation bar (persistent)
@@ -321,8 +323,8 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ### 6.1 Sale Transaction Flow
 1. **Start:** Dashboard → POS Screen
 2. **Product Selection:** Browse categories → Search/Scan → Add to cart
-3. **Cart Review:** Adjust quantities → Add customer details → Apply discounts
-4. **Payment:** Select payment method → Process payment → Generate receipt
+3. **Cart Review:** Adjust quantities → adjust unit of measure → Add customer details → Apply discounts
+4. **Payment:** Select payment method → enter type of payment ex. utang → enter amount receive options "exact amount" other amount liek 10,20,50,100,200,500,1000 → Process payment → Generate receipt - print receipt
 5. **End:** Return to POS or Dashboard
 
 ### 6.2 Product Addition Flow
@@ -337,8 +339,8 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ### 6.3 Inventory Management Flow
 1. **Start:** Dashboard → Inventory
 2. **View:** Toggle between list and replenishment views
-3. **Adjust:** Quick +/- for stock adjustments
-4. **Edit:** Inline edit for major changes
+3. **Adjust:** Quick +/- for stock adjustments must have a adjustment memo to trace all transactions.
+4. **Edit:** Inline edit for major changes in all data
 5. **Monitor:** View category totals and low stock alerts
 
 ---
@@ -348,14 +350,14 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ### 7.1 Pricing Rules
 - Base unit price is mandatory
 - Additional unit prices can be auto-calculated or manually set
-- Wholesale prices typically offer 10-15% discount
+- Wholesale prices typically offer 10-15% discount or manually set
 - Minimum markup calculation: (Price - Cost) / Cost * 100
 
 ### 7.2 Inventory Rules
 - Stock cannot go negative (except for pre-orders if enabled)
 - Low stock alerts trigger at defined threshold
 - Stock adjustments require reason/note
-- Multi-unit stock displayed in base unit equivalent
+- Multi-unit stock displayed in base unit equivalent but with options to view individual units on-hand qty amount.
 
 ### 7.3 Transaction Rules
 - Receipt numbers are sequential and unique
@@ -368,7 +370,7 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ## 8. Integration Requirements
 
 ### 8.1 Third-Party Services
-- Payment gateways (future: GCash, PayMaya)
+- skip later Payment gateways (future: GCash, PayMaya)
 - SMS notifications (future: customer receipts)
 - Cloud storage for backups
 - Analytics services
@@ -408,13 +410,13 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Multi-branch support
 - Employee management and permissions
 - Advanced reporting and analytics
-- Loyalty programs
-- Promotional campaigns
+- skip later Loyalty programs
+- skip later Promotional campaigns
 - Supplier management
-- Purchase order system
+- Purchase order system - optional but connected to receiving voucher
 - Expiry date tracking
 
-### 10.2 Integration Expansions
+### 10.2 skip later Integration Expansions
 - Accounting software integration
 - E-commerce platform sync
 - Social media selling integration
@@ -426,7 +428,8 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - Dedicated POS hardware support
 - Weighing scale integration
 - RFID support
-
+- QR Code scanning and generation
+- Barcode scanning and generation
 ---
 
 ## 11. Risks & Mitigation
@@ -450,12 +453,16 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 ## 12. Timeline & Milestones
 
 ### Phase 1 (Current MVP)
-- ✅ Core POS functionality
-- ✅ Basic inventory management
-- ✅ Multi-unit support
-- ✅ Product management
-- ✅ Payment processing
-- ✅ Receipt generation
+- Core POS functionality
+- Detailed inventory management. Transactions affecting on-hand qty or inventory quantity of products are Receiving voucher entry which is additional in inventory quantity, Customer Sales Return which is additional in inventory quantity, Inventory Adjustments in and out, Inventory Transfer in and out by branches or locations like warehouse. Sales in POS which is deduction in inventory quantity. Return Product voucher to Supplier which is a deduction in inventory quantity of the Products. We need to have all this transactions with complete functionality and CRUD.
+- Preserve the current UI/UX designs in the application POS and related screens. Home screen also and Product.  Inventory screen will be removed.
+- Multi-unit support. Products have Base unit of measurement and additional 6 unit of measure like pieces, kilograms, liters, etc. example  Base unit is kilo the 50 number of base unit in Sack, example2 50 pieces in box. Then add a field for Selling price for the units added.
+- Product management with CRUD functionality. List view options. Fields sorting. and Arranging in the Display list.
+- Payment processing
+- Receipt generation
+- Product category management with CRUD functionality. List view options. Fields sorting. and Arranging in the Display list.
+- add additional data management to other data integrated in the application POS. with CRUD functionality. List view options. Fields sorting. and Arranging in the Display list.
+- Data backup and recovery Cloud and can be downloaded locally.
 
 ### Phase 2 (Q2 2025)
 - [ ] User authentication
@@ -470,7 +477,6 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 - [ ] Integration APIs
 - [ ] Mobile app versions
 
----
 
 ## 13. Appendix
 
@@ -495,4 +501,4 @@ A comprehensive Point of Sale (POS) mobile web application designed specifically
 **Document Control:**
 - Review Cycle: Quarterly
 - Distribution: Development Team, Product Management, Stakeholders
-- Feedback: product@company.com
+- Feedback: zapwebapp007@gmail.com

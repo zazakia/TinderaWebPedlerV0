@@ -1,279 +1,340 @@
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { Database } from '@/types/database'
-
-type Transaction = Database['public']['Tables']['transactions']['Row']
-type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
-type TransactionItem = Database['public']['Tables']['transaction_items']['Row']
-
-export interface TransactionWithItems extends Transaction {
-  transaction_items?: TransactionItem[]
-  customer?: Database['public']['Tables']['customers']['Row'] | null
-}
-
-export interface CartItem {
-  product_id: string
-  product_name: string
-  quantity: number
-  unit_name: string
-  unit_price: number
-  subtotal: number
-}
+import { useState, useEffect } from "react";
+import {
+  supabase,
+  type Transaction,
+  type TransactionItem,
+} from "@/lib/supabase";
 
 export function useTransactions() {
-  const [transactions, setTransactions] = useState<TransactionWithItems[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch all transactions
-  const fetchTransactions = async (limit = 50) => {
+  // Fetch transactions
+  const fetchTransactions = async () => {
     try {
-      setLoading(true)
-      setError(null)
-
+      setLoading(true);
       const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          customer:customers(*),
-          transaction_items(*)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit)
+        .from("transactions")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error
-      setTransactions(data || [])
+      if (error) throw error;
+
+      setTransactions(data || []);
+      setError(null);
     } catch (err) {
-      console.error('Error fetching transactions:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch transactions')
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch transactions",
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Create a new transaction
-  const createTransaction = async (
-    cartItems: CartItem[],
-    paymentMethod: string,
-    customerId?: string,
-    isCredit: boolean = false,
-    serviceFee: number = 0,
-    deliveryFee: number = 0,
-    discount: number = 0,
-    tax: number = 0,
-    notes?: string
-  ) => {
+  // Create transaction
+  const createTransaction = async (transactionData: {
+    items: any[];
+    subtotal: number;
+    tax?: number;
+    discount?: number;
+    total: number;
+    payment_method: string;
+    status?: string;
+  }) => {
     try {
-      // Calculate totals
-      const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0)
-      const total = subtotal + serviceFee + deliveryFee + tax - discount
-
-      // Generate receipt number
-      const { data: receiptNumber, error: receiptError } = await supabase
-        .rpc('generate_receipt_number')
-
-      if (receiptError) throw receiptError
-
-      // Create transaction
-      const transactionData: TransactionInsert = {
-        customer_id: customerId,
-        receipt_number: receiptNumber,
-        items: cartItems, // Store as JSON for quick reference
-        subtotal,
-        tax,
-        discount,
-        service_fee: serviceFee,
-        delivery_fee: deliveryFee,
-        total,
-        payment_method: paymentMethod,
-        is_credit: isCredit,
-        notes,
-        status: 'completed'
-      }
-
-      const { data: newTransaction, error: transactionError } = await supabase
-        .from('transactions')
-        .insert(transactionData)
+      const { data, error } = await supabase
+        .from("transactions")
+        .insert([
+          {
+            ...transactionData,
+            tax: transactionData.tax || 0,
+            discount: transactionData.discount || 0,
+            status: transactionData.status || "completed",
+          },
+        ])
         .select()
-        .single()
+        .single();
 
-      if (transactionError) throw transactionError
+      if (error) throw error;
 
-      // Create transaction items for better reporting
-      if (newTransaction) {
-        const transactionItems = cartItems.map(item => ({
-          transaction_id: newTransaction.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price: item.unit_price,
-          unit_type: 'retail' as const // You can determine this based on the unit selected
-        }))
+      await fetchTransactions(); // Refresh the list
+      return data;
+    } catch (err) {
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to create transaction",
+      );
+    }
+  };
 
-        const { error: itemsError } = await supabase
-          .from('transaction_items')
-          .insert(transactionItems)
+  // Create transaction with items (includes stock updates)
+  const createTransactionWithItems = async (transactionData: {
+    items: Array<{
+      product_id: string;
+      quantity: number;
+      price: number;
+      unit_type: "retail" | "wholesale";
+      name?: string;
+    }>;
+    subtotal: number;
+    tax?: number;
+    discount?: number;
+    total: number;
+    payment_method: string;
+    status?: string;
+  }) => {
+    try {
+      // Create the transaction
+      const { data: transaction, error: transactionError } = await supabase
+        .from("transactions")
+        .insert([
+          {
+            items: transactionData.items,
+            subtotal: transactionData.subtotal,
+            tax: transactionData.tax || 0,
+            discount: transactionData.discount || 0,
+            total: transactionData.total,
+            payment_method: transactionData.payment_method,
+            status: transactionData.status || "completed",
+          },
+        ])
+        .select()
+        .single();
 
-        if (itemsError) throw itemsError
+      if (transactionError) throw transactionError;
 
-        // Update product stock
-        for (const item of cartItems) {
-          await supabase.rpc('update_product_stock', {
-            p_product_id: item.product_id,
-            p_quantity_sold: item.quantity
-          })
-        }
+      // Create transaction items
+      const itemsToInsert = transactionData.items.map((item) => ({
+        transaction_id: transaction.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+        unit_type: item.unit_type,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("transaction_items")
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+
+      // Update stock for products
+      for (const item of transactionData.items) {
+        // Get current stock
+        const { data: product, error: fetchError } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", item.product_id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // Calculate new stock
+        const newStock = Math.max(0, product.stock - item.quantity);
+
+        // Update stock
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ stock: newStock })
+          .eq("id", item.product_id);
+
+        if (updateError) throw updateError;
       }
 
-      await fetchTransactions() // Refresh the transactions list
-      return { success: true, data: newTransaction }
+      await fetchTransactions(); // Refresh the list
+      return transaction;
     } catch (err) {
-      console.error('Error creating transaction:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to create transaction' }
+      throw new Error(
+        err instanceof Error
+          ? err.message
+          : "Failed to create transaction with items",
+      );
     }
-  }
+  };
 
-  // Get transaction by ID
-  const getTransaction = async (id: string) => {
+  // Get transaction by ID with items
+  const getTransactionById = async (id: string) => {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(`
+      const { data: transaction, error: transactionError } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (transactionError) throw transactionError;
+
+      const { data: items, error: itemsError } = await supabase
+        .from("transaction_items")
+        .select(
+          `
           *,
-          customer:customers(*),
-          transaction_items(*)
-        `)
-        .eq('id', id)
-        .single()
+          product:products(name, sku)
+        `,
+        )
+        .eq("transaction_id", id);
 
-      if (error) throw error
-      return { success: true, data }
+      if (itemsError) throw itemsError;
+
+      return {
+        ...transaction,
+        transaction_items: items || [],
+      };
     } catch (err) {
-      console.error('Error fetching transaction:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch transaction' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to get transaction",
+      );
     }
-  }
+  };
 
-  // Get today's transactions
-  const getTodayTransactions = async () => {
+  // Get sales summary for a date range
+  const getSalesSummary = async (startDate?: string, endDate?: string) => {
     try {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          customer:customers(*),
-          transaction_items(*)
-        `)
-        .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false })
+      let query = supabase
+        .from("transactions")
+        .select("total, created_at, payment_method")
+        .eq("status", "completed");
 
-      if (error) throw error
-      return { success: true, data }
+      if (startDate) {
+        query = query.gte("created_at", startDate);
+      }
+      if (endDate) {
+        query = query.lte("created_at", endDate);
+      }
+
+      const { data, error } = await query.order("created_at", {
+        ascending: false,
+      });
+
+      if (error) throw error;
+
+      const summary = {
+        totalSales:
+          data?.reduce((sum, transaction) => sum + transaction.total, 0) || 0,
+        transactionCount: data?.length || 0,
+        averageTransaction: data?.length
+          ? data.reduce((sum, transaction) => sum + transaction.total, 0) /
+            data.length
+          : 0,
+        paymentMethods:
+          data?.reduce(
+            (acc, transaction) => {
+              acc[transaction.payment_method] =
+                (acc[transaction.payment_method] || 0) + transaction.total;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ) || {},
+        transactions: data || [],
+      };
+
+      return summary;
     } catch (err) {
-      console.error('Error fetching today transactions:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch today transactions' }
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to get sales summary",
+      );
     }
-  }
+  };
 
-  // Get sales summary
-  const getSalesSummary = async (startDate?: Date, endDate?: Date) => {
-    try {
-      const { data, error } = await supabase
-        .rpc('get_sales_summary', {
-          p_start_date: startDate?.toISOString(),
-          p_end_date: endDate?.toISOString()
-        })
+  // Get today's sales
+  const getTodaysSales = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date(Date.now() + 86400000)
+      .toISOString()
+      .split("T")[0];
 
-      if (error) throw error
-      return { success: true, data }
-    } catch (err) {
-      console.error('Error fetching sales summary:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch sales summary' }
-    }
-  }
+    return getSalesSummary(today, tomorrow);
+  };
 
-  // Void/Cancel transaction
-  const voidTransaction = async (id: string, reason?: string) => {
-    try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ 
-          status: 'voided',
-          notes: reason ? `VOIDED: ${reason}` : 'VOIDED'
-        })
-        .eq('id', id)
-
-      if (error) throw error
-
-      // TODO: Restore product stock
-      // This should be done via a database trigger or function
-
-      await fetchTransactions() // Refresh the transactions list
-      return { success: true }
-    } catch (err) {
-      console.error('Error voiding transaction:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to void transaction' }
-    }
-  }
-
-  // Get transactions by date range
-  const getTransactionsByDateRange = async (startDate: Date, endDate: Date) => {
+  // Update transaction status
+  const updateTransactionStatus = async (id: string, status: string) => {
     try {
       const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          customer:customers(*),
-          transaction_items(*)
-        `)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: false })
+        .from("transactions")
+        .update({ status })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (error) throw error
-      return { success: true, data }
+      if (error) throw error;
+
+      await fetchTransactions(); // Refresh the list
+      return data;
     } catch (err) {
-      console.error('Error fetching transactions by date range:', err)
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to fetch transactions by date range' }
+      throw new Error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update transaction status",
+      );
     }
-  }
+  };
 
-  // Initial fetch
+  // Delete transaction (and its items)
+  const deleteTransaction = async (id: string) => {
+    try {
+      // Delete transaction items first (due to foreign key constraint)
+      const { error: itemsError } = await supabase
+        .from("transaction_items")
+        .delete()
+        .eq("transaction_id", id);
+
+      if (itemsError) throw itemsError;
+
+      // Delete the transaction
+      const { error: transactionError } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", id);
+
+      if (transactionError) throw transactionError;
+
+      await fetchTransactions(); // Refresh the list
+    } catch (err) {
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to delete transaction",
+      );
+    }
+  };
+
   useEffect(() => {
-    fetchTransactions()
-  }, [])
-
-  // Subscribe to real-time changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('transactions-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'transactions' },
-        () => {
-          fetchTransactions()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+    fetchTransactions();
+  }, []);
 
   return {
     transactions,
     loading,
     error,
-    fetchTransactions,
     createTransaction,
-    getTransaction,
-    getTodayTransactions,
+    createTransactionWithItems,
+    getTransactionById,
     getSalesSummary,
-    voidTransaction,
-    getTransactionsByDateRange
-  }
+    getTodaysSales,
+    updateTransactionStatus,
+    deleteTransaction,
+    bulkUpdateStock: async (
+      updates: Array<{ id: string; quantity: number }>,
+    ) => {
+      for (const update of updates) {
+        // Get current stock
+        const { data: product, error: fetchError } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", update.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // Calculate new stock
+        const newStock = Math.max(0, product.stock - update.quantity);
+
+        // Update stock
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ stock: newStock })
+          .eq("id", update.id);
+
+        if (updateError) throw updateError;
+      }
+    },
+    refetch: fetchTransactions,
+  };
 }
