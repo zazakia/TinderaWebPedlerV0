@@ -172,7 +172,9 @@ function POSScreen({
   products: any[];
   categories: any[];
 }) {
-  const [cart, setCart] = useState<{ [key: string]: number }>({});
+  const [cart, setCart] = useState<{
+    [key: string]: { quantity: number; selectedUnit: any };
+  }>({});
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCart, setShowCart] = useState(false);
@@ -188,23 +190,44 @@ function POSScreen({
   });
 
   const cartItems = Object.entries(cart)
-    .map(([productId, quantity]) => {
+    .map(([productId, cartData]) => {
       const product = products.find((p) => p.id === productId);
+      const selectedUnit = cartData.selectedUnit ||
+        (product.units && product.units[0]) || {
+          name: "pcs",
+          retailPrice: product.price,
+        };
+      const unitPrice = selectedUnit.retailPrice || product.price;
       return {
         ...product,
-        quantity,
-        subtotal: product.price * quantity,
+        quantity: cartData.quantity,
+        selectedUnit,
+        unitPrice,
+        subtotal: unitPrice * cartData.quantity,
       };
     })
     .filter((item) => item.quantity > 0);
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+  const cartCount = Object.values(cart).reduce(
+    (sum, cartData) => sum + cartData.quantity,
+    0,
+  );
 
-  const addToCart = (productId: string) => {
+  const addToCart = (productId: string, selectedUnit?: any) => {
+    const product = products.find((p) => p.id === productId);
+    const unit = selectedUnit ||
+      (product.units && product.units[0]) || {
+        name: "pcs",
+        retailPrice: product.price,
+      };
+
     setCart((prev) => ({
       ...prev,
-      [productId]: (prev[productId] || 0) + 1,
+      [productId]: {
+        quantity: (prev[productId]?.quantity || 0) + 1,
+        selectedUnit: unit,
+      },
     }));
   };
 
@@ -216,9 +239,22 @@ function POSScreen({
     } else {
       setCart((prev) => ({
         ...prev,
-        [productId]: quantity,
+        [productId]: {
+          ...prev[productId],
+          quantity: quantity,
+        },
       }));
     }
+  };
+
+  const updateCartUnit = (productId: string, selectedUnit: any) => {
+    setCart((prev) => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        selectedUnit: selectedUnit,
+      },
+    }));
   };
 
   const handleCheckout = async () => {
@@ -227,9 +263,11 @@ function POSScreen({
         items: cartItems.map((item) => ({
           product_id: item.id,
           quantity: item.quantity,
-          price: item.price,
-          unit_type: "retail" as const,
+          price: item.unitPrice,
+          unit_type: item.selectedUnit?.type || ("retail" as const),
           name: item.name,
+          unit_name:
+            item.selectedUnit?.displayName || item.selectedUnit?.name || "pcs",
         })),
         subtotal: cartTotal,
         total: cartTotal,
@@ -277,8 +315,33 @@ function POSScreen({
                       <div className="flex-1">
                         <h4 className="font-medium">{item.name}</h4>
                         <p className="text-sm text-gray-600">
-                          ₱{item.price.toFixed(2)} each
+                          ₱{item.unitPrice.toFixed(2)} per{" "}
+                          {item.selectedUnit?.displayName ||
+                            item.selectedUnit?.name ||
+                            "piece"}
                         </p>
+                        {item.units && item.units.length > 1 && (
+                          <Select
+                            value={item.selectedUnit?.name || "pcs"}
+                            onValueChange={(value) => {
+                              const newUnit = item.units.find(
+                                (u: any) => u.name === value,
+                              );
+                              if (newUnit) updateCartUnit(item.id, newUnit);
+                            }}
+                          >
+                            <SelectTrigger className="w-20 h-6 text-xs mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {item.units.map((unit: any) => (
+                                <SelectItem key={unit.name} value={unit.name}>
+                                  {unit.displayName || unit.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -392,26 +455,34 @@ function POSScreen({
               </div>
               <h4 className="font-medium text-sm mb-1">{product.name}</h4>
               <p className="text-purple-600 font-bold">
-                ₱{product.price.toFixed(2)}
+                ₱{(product.units?.[0]?.retailPrice || product.price).toFixed(2)}
               </p>
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-gray-500 mb-1">
                 Stock: {product.stock}
               </p>
+              {product.units && product.units.length > 1 && (
+                <p className="text-xs text-blue-600 mb-2">
+                  {product.units.length} units available
+                </p>
+              )}
               <div className="flex items-center gap-1">
-                {cart[product.id] > 0 ? (
+                {cart[product.id]?.quantity > 0 ? (
                   <div className="flex items-center gap-1 flex-1">
                     <Button
                       size="sm"
                       variant="outline"
                       className="w-8 h-8 p-0"
                       onClick={() =>
-                        updateCartQuantity(product.id, cart[product.id] - 1)
+                        updateCartQuantity(
+                          product.id,
+                          cart[product.id].quantity - 1,
+                        )
                       }
                     >
                       <Minus className="w-3 h-3" />
                     </Button>
                     <span className="flex-1 text-center text-sm">
-                      {cart[product.id]}
+                      {cart[product.id].quantity}
                     </span>
                     <Button
                       size="sm"
@@ -824,9 +895,118 @@ function AddProductScreen({
     baseUnit: editingProduct?.baseUnit || "pcs",
   });
 
+  // Multi-unit state management
+  const [units, setUnits] = useState(
+    editingProduct?.units || [
+      {
+        id: 1,
+        name: "pcs",
+        displayName: "Pieces",
+        conversionFactor: 1,
+        retailPrice: "",
+        wholesalePrice: "",
+        isBase: true,
+        type: "retail",
+      },
+    ],
+  );
+
+  const availableUnits = [
+    { value: "pcs", label: "Pieces" },
+    { value: "kg", label: "Kilogram" },
+    { value: "g", label: "Gram" },
+    { value: "liter", label: "Liter" },
+    { value: "ml", label: "Milliliter" },
+    { value: "box", label: "Box" },
+    { value: "case", label: "Case" },
+    { value: "dozen", label: "Dozen" },
+    { value: "pack", label: "Pack" },
+    { value: "carton", label: "Carton" },
+    { value: "sack", label: "Sack" },
+    { value: "bundle", label: "Bundle" },
+  ];
+
+  // Add new unit
+  const addUnit = () => {
+    if (units.length >= 7) {
+      alert("Maximum 7 units allowed (1 base + 6 additional)");
+      return;
+    }
+
+    const newUnit = {
+      id: Date.now(),
+      name: "box",
+      displayName: "Box",
+      conversionFactor: 1,
+      retailPrice: "",
+      wholesalePrice: "",
+      isBase: false,
+      type: "retail",
+    };
+    setUnits([...units, newUnit]);
+  };
+
+  // Remove unit
+  const removeUnit = (unitId: number) => {
+    if (units.length <= 1) {
+      alert("At least one unit is required");
+      return;
+    }
+    setUnits(units.filter((unit) => unit.id !== unitId));
+  };
+
+  // Update unit
+  const updateUnit = (unitId: number, field: string, value: any) => {
+    setUnits(
+      units.map((unit) =>
+        unit.id === unitId
+          ? {
+              ...unit,
+              [field]: value,
+              ...(field === "name"
+                ? {
+                    displayName:
+                      availableUnits.find((u) => u.value === value)?.label ||
+                      value,
+                  }
+                : {}),
+            }
+          : unit,
+      ),
+    );
+  };
+
+  // Auto-calculate prices based on base unit
+  const calculatePrices = (unitId: number) => {
+    const unit = units.find((u) => u.id === unitId);
+    const baseUnit = units.find((u) => u.isBase);
+
+    if (!unit || !baseUnit || !formData.price) return;
+
+    const basePrice = parseFloat(formData.price);
+    const conversionFactor = parseFloat(unit.conversionFactor.toString()) || 1;
+
+    const calculatedRetailPrice = (basePrice * conversionFactor).toFixed(2);
+    const calculatedWholesalePrice = (
+      basePrice *
+      conversionFactor *
+      0.85
+    ).toFixed(2); // 15% wholesale discount
+
+    updateUnit(unitId, "retailPrice", calculatedRetailPrice);
+    updateUnit(unitId, "wholesalePrice", calculatedWholesalePrice);
+  };
+
   const handleSave = () => {
     if (!formData.name || !formData.price) {
       alert("Please fill in required fields");
+      return;
+    }
+
+    // Validate units
+    const hasBaseUnit = units.some((unit) => unit.isBase);
+    if (!hasBaseUnit) {
+      alert("Please set one unit as base unit");
       return;
     }
 
@@ -835,15 +1015,15 @@ function AddProductScreen({
       price: parseFloat(formData.price),
       cost: parseFloat(formData.cost) || 0,
       stock: parseInt(formData.stock) || 0,
-      units: [
-        {
-          name: formData.baseUnit,
-          conversionFactor: 1,
-          price: formData.price,
-          isBase: true,
-          type: "retail",
-        },
-      ],
+      units: units.map((unit) => ({
+        name: unit.name,
+        displayName: unit.displayName,
+        conversionFactor: parseFloat(unit.conversionFactor.toString()) || 1,
+        retailPrice: parseFloat(unit.retailPrice.toString()) || 0,
+        wholesalePrice: parseFloat(unit.wholesalePrice.toString()) || 0,
+        isBase: unit.isBase,
+        type: unit.type,
+      })),
     };
 
     onSave(productData);
@@ -922,38 +1102,193 @@ function AddProductScreen({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="stock">Stock</Label>
-              <Input
-                id="stock"
-                type="number"
-                value={formData.stock}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, stock: e.target.value }))
-                }
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="baseUnit">Unit</Label>
-              <Select
-                value={formData.baseUnit}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, baseUnit: value }))
-                }
+          <div>
+            <Label htmlFor="stock">Stock (in base unit)</Label>
+            <Input
+              id="stock"
+              type="number"
+              value={formData.stock}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, stock: e.target.value }))
+              }
+              placeholder="0"
+            />
+          </div>
+
+          {/* Multi-Unit Configuration */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-semibold">
+                Unit of Measures
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addUnit}
+                className="text-xs"
+                disabled={units.length >= 7}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pcs">Pieces</SelectItem>
-                  <SelectItem value="kg">Kilogram</SelectItem>
-                  <SelectItem value="liter">Liter</SelectItem>
-                  <SelectItem value="box">Box</SelectItem>
-                </SelectContent>
-              </Select>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Unit
+              </Button>
             </div>
+
+            {units.map((unit, index) => (
+              <div
+                key={unit.id}
+                className="border rounded-lg p-4 space-y-3 bg-gray-50"
+              >
+                <div className="flex justify-between items-center">
+                  <Label className="font-medium">
+                    Unit {index + 1} {unit.isBase ? "(Base Unit)" : ""}
+                  </Label>
+                  {!unit.isBase && units.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeUnit(unit.id)}
+                      className="text-red-500 p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Unit Type</Label>
+                    <Select
+                      value={unit.name}
+                      onValueChange={(value) =>
+                        updateUnit(unit.id, "name", value)
+                      }
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableUnits.map((unitOption) => (
+                          <SelectItem
+                            key={unitOption.value}
+                            value={unitOption.value}
+                          >
+                            {unitOption.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Conversion Factor</Label>
+                    <Input
+                      type="number"
+                      value={unit.conversionFactor}
+                      onChange={(e) =>
+                        updateUnit(unit.id, "conversionFactor", e.target.value)
+                      }
+                      placeholder="1"
+                      className="h-8"
+                      step="0.01"
+                      disabled={unit.isBase}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Retail Price</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        value={unit.retailPrice}
+                        onChange={(e) =>
+                          updateUnit(unit.id, "retailPrice", e.target.value)
+                        }
+                        placeholder="0.00"
+                        className="h-8"
+                        step="0.01"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => calculatePrices(unit.id)}
+                        className="px-2"
+                        title="Auto-calculate"
+                      >
+                        <Calculator className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Wholesale Price</Label>
+                    <Input
+                      type="number"
+                      value={unit.wholesalePrice}
+                      onChange={(e) =>
+                        updateUnit(unit.id, "wholesalePrice", e.target.value)
+                      }
+                      placeholder="0.00"
+                      className="h-8"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id={`base-${unit.id}`}
+                      checked={unit.isBase}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          // Set this as base unit and unset others
+                          setUnits(
+                            units.map((u) => ({
+                              ...u,
+                              isBase: u.id === unit.id,
+                              conversionFactor:
+                                u.id === unit.id ? 1 : u.conversionFactor,
+                            })),
+                          );
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`base-${unit.id}`} className="text-sm">
+                      Base Unit
+                    </Label>
+                  </div>
+
+                  <Select
+                    value={unit.type}
+                    onValueChange={(value) =>
+                      updateUnit(unit.id, "type", value)
+                    }
+                  >
+                    <SelectTrigger className="w-24 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="wholesale">Wholesale</SelectItem>
+                      <SelectItem value="both">Both</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Conversion Preview */}
+                {!unit.isBase && unit.conversionFactor > 0 && (
+                  <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                    💡 1 {unit.displayName} = {unit.conversionFactor}{" "}
+                    {units.find((u) => u.isBase)?.displayName || "base units"}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           <div>
