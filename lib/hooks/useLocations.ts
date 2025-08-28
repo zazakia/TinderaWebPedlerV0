@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/hooks/useSupabase'
+import { createClient } from '@/lib/supabase'
 import { Database } from '@/types/database'
 
 type Location = Database['public']['Tables']['locations']['Row']
