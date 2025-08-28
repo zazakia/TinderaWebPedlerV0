@@ -1,0 +1,5 @@
+export { default as AuthGuard, withAuth, useCurrentUser } from './AuthGuard'
+export { default as LoginScreen } from './LoginScreen'  
+export { default as RegisterScreen } from './RegisterScreen'
+export { useAuth, usePermissions, AuthProvider } from '@/lib/hooks/useAuth'
+export type { UserRole, UserProfile, AuthContextType } from '@/lib/hooks/useAuth'

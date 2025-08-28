@@ -23,7 +23,6 @@ The project is a web application built using the Next.js framework. It follows a
     - `loading.tsx`: Loading component.
     - `page.tsx`: Main page component.
   - **`components/`**: Contains reusable components.
-    - `add-product.tsx`: Component for adding products.
     - `theme-provider.tsx`: Component for theme management.
     - **`ui/`**: Contains UI components.
       - Various UI components like `accordion.tsx`, `alert-dialog.tsx`, etc.
@@ -44,7 +43,6 @@ The project is a web application built using the Next.js framework. It follows a
   - **`loading.tsx`**: Displays a loading state while the page is being loaded.
 
 - **`components/` Directory:**
-  - **`add-product.tsx`**: A component for adding products, likely used in an admin or product management section.
   - **`theme-provider.tsx`**: Manages the theme of the application, possibly supporting light and dark modes.
   - **`ui/` Directory:** Contains a variety of UI components that are likely used throughout the application, such as buttons, forms, modals, etc.
 
