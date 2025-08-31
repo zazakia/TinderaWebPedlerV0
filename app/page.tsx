@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import ComponentShowcase from "@/components/component-showcase";
 import {
   Select,
   SelectContent,
@@ -132,6 +133,13 @@ function DashboardScreen({
             <button className="w-full p-3 bg-gray-50 rounded-lg text-left flex items-center gap-3">
               <User className="w-4 h-4 text-gray-600" />
               <span className="text-gray-800">Manage Customers</span>
+            </button>
+            <button
+              onClick={() => onNavigate("componentShowcase")}
+              className="w-full p-3 bg-gray-50 rounded-lg text-left flex items-center gap-3"
+            >
+              <Monitor className="w-4 h-4 text-gray-600" />
+              <span className="text-gray-800">View All Components</span>
             </button>
           </div>
         </div>
@@ -1333,7 +1341,7 @@ function AddProductScreen({
 // Main Dashboard Component
 export default function Dashboard() {
   const [currentScreen, setCurrentScreen] = useState<
-    "dashboard" | "pos" | "inventory" | "products" | "addProduct"
+    "dashboard" | "pos" | "inventory" | "products" | "addProduct" | "componentShowcase"
   >("dashboard");
   const [editingProduct, setEditingProduct] = useState<any>(null);
 
@@ -1494,6 +1502,10 @@ export default function Dashboard() {
         editingProduct={editingProduct}
       />
     );
+  }
+
+  if (currentScreen === "componentShowcase") {
+    return <ComponentShowcase onBack={() => setCurrentScreen("dashboard")} />;
   }
 
   // Default dashboard screen
